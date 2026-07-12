@@ -1,0 +1,16 @@
+{
+  "name": "sal-virtual-charger",
+  "version": "0.1.0",
+  "private": true,
+  "type": "module",
+  "description": "SAL — a virtual OCPP 2.0.1 charge point you drive from the browser, connected to a real CSMS via a relay.",
+  "scripts": {
+    "start": "node server.js",
+    "mock-csms": "node mock-csms/server.js",
+    "smoke": "node test/smoke.js"
+  },
+  "dependencies": {
+    "ocpp-rpc": "^2.2.1",
+    "ws": "^8.18.0"
+  }
+}
