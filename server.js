@@ -17,10 +17,22 @@ import { fileURLToPath } from 'node:url';
 import { dirname } from 'node:path';
 import { WebSocketServer } from 'ws';
 import { VirtualCharger } from './src/charger.js';
+import { startMockCSMS } from './mock-csms/server.js';
 
 const __dirname = dirname(fileURLToPath(import.meta.url));
 const PUBLIC = join(__dirname, 'public');
 const PORT = process.env.PORT || 8080;
+
+// A built-in OCPP 2.0.1 CSMS runs inside this process on a loopback-only port,
+// so visitors can explore a full session with no backend of their own ("demo"
+// mode). It is never exposed publicly — only this relay, on localhost, dials it.
+const MOCK_PORT = process.env.MOCK_PORT || 9000;
+const DEMO_ENDPOINT = `ws://127.0.0.1:${MOCK_PORT}`;
+try {
+  await startMockCSMS(MOCK_PORT);
+} catch (err) {
+  console.warn(`[SAL] built-in demo CSMS not started (${err.message}) — demo mode may be unavailable`);
+}
 
 const MIME = {
   '.html': 'text/html; charset=utf-8',
@@ -86,20 +98,23 @@ wss.on('connection', (browser) => {
     try {
       if (msg.type === 'connect') {
         if (charger) await charger.disconnect().catch(() => {});
-        if (!endpointAllowed(msg.endpoint)) {
-          send({ type: 'error', message: 'Endpoint not allowed. Use wss:// or ws://localhost.' });
+        // Demo mode → the built-in CSMS (fixed, trusted). Otherwise the user's
+        // own CSMS, subject to the guardrail.
+        const endpoint = msg.demo ? DEMO_ENDPOINT : msg.endpoint;
+        if (!msg.demo && !endpointAllowed(endpoint)) {
+          send({ type: 'error', message: 'Endpoint not allowed. Use wss:// (any) or ws://localhost.' });
           return;
         }
         charger = new VirtualCharger({
-          endpoint: msg.endpoint,
+          endpoint,
           identity: msg.identity || `CS-${Math.floor(Math.random() * 1e6)}`,
-          password: msg.password || undefined,
+          password: msg.demo ? undefined : (msg.password || undefined),
           model: msg.model || 'SAL-1',
           onLog: (entry) => send({ type: 'log', entry }),
           onState: (state) => send({ type: 'state', state }),
         });
         await charger.connect();
-        send({ type: 'connected', identity: charger.identity });
+        send({ type: 'connected', identity: charger.identity, demo: !!msg.demo });
         return;
       }
 
@@ -138,5 +153,5 @@ wss.on('connection', (browser) => {
 
 httpServer.listen(PORT, () => {
   console.log(`[SAL] relay + UI on http://localhost:${PORT}`);
-  console.log(`[SAL] start the mock CSMS with:  npm run mock-csms   (ws://localhost:9000)`);
+  console.log(`[SAL] built-in demo CSMS on ${DEMO_ENDPOINT} — "Explore" mode uses it, no setup needed`);
 });

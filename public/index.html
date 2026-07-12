@@ -21,23 +21,31 @@
   </div>
 </header>
 
-<section class="connect">
+<section class="connect mode-demo" data-connect-section>
+  <div class="mode-toggle" data-mode-toggle>
+    <button type="button" class="mode-btn active" data-mode="demo">🎬 Explore — demo CSMS</button>
+    <button type="button" class="mode-btn" data-mode="own">🔌 Connect my CSMS</button>
+  </div>
+
   <form class="connect-form" data-connect-form>
-    <div class="field grow">
-      <label for="endpoint">CSMS endpoint</label>
-      <input id="endpoint" name="endpoint" value="ws://localhost:9000" placeholder="wss://your-csms.example.com/ocpp/CS001" />
+    <div class="own-fields" data-own-fields>
+      <div class="field grow">
+        <label for="endpoint">CSMS endpoint</label>
+        <input id="endpoint" name="endpoint" placeholder="wss://your-csms.example.com/ocpp/CS001" />
+      </div>
+      <div class="field">
+        <label for="identity">Station ID</label>
+        <input id="identity" name="identity" value="SAL-001" />
+      </div>
+      <div class="field">
+        <label for="password">Password <span class="opt">(Basic auth, optional)</span></label>
+        <input id="password" name="password" type="password" placeholder="—" />
+      </div>
     </div>
-    <div class="field">
-      <label for="identity">Station ID</label>
-      <input id="identity" name="identity" value="SAL-001" />
-    </div>
-    <div class="field">
-      <label for="password">Password <span class="opt">(Basic auth, optional)</span></label>
-      <input id="password" name="password" type="password" placeholder="—" />
-    </div>
+    <p class="demo-note" data-demo-note>A built-in OCPP&nbsp;2.0.1 CSMS runs on the server — just hit <strong>Connect</strong> and drive the station. No backend of your own needed.</p>
     <button type="submit" class="btn btn-primary" data-connect-btn>Connect</button>
   </form>
-  <p class="hint">Point it at your own CSMS (<code>wss://</code>), or run the bundled mock: <code>npm run mock-csms</code> then use <code>ws://localhost:9000</code>.</p>
+  <p class="hint" data-own-hint>Enter your CSMS's <code>wss://</code> URL, a station id, and a Basic-auth password if it needs one. The relay presents the auth headers your browser can't.</p>
 </section>
 
 <main class="grid">

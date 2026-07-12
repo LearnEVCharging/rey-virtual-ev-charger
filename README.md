@@ -23,16 +23,21 @@ distinct stations).
 
 ```bash
 npm install
-npm run mock-csms     # terminal 1 — a minimal OCPP 2.0.1 CSMS on ws://localhost:9000
-npm start             # terminal 2 — the relay + UI on http://localhost:8080
+npm start             # relay + UI on http://localhost:8080 (a demo CSMS runs in-process)
 ```
 
-Open http://localhost:8080, click **Connect** (defaults to the mock), then drive
-the station: Boot → Plug in → Tap RFID → Start → Stop → Unplug, and watch every
-frame in the live log. Point the endpoint at a real `wss://` CSMS to test yours.
+Open http://localhost:8080. Two modes:
+
+- **🎬 Explore — demo CSMS** (default): a built-in OCPP 2.0.1 CSMS runs inside the
+  server, so you just click **Connect** and drive the station — no backend of
+  your own needed. Boot → Plug in → Tap RFID → Start → Stop → Unplug, and watch
+  every frame in the live log.
+- **🔌 Connect my CSMS**: enter your CSMS's `wss://` URL (+ station id / Basic-auth
+  password) and SAL connects to it — the relay presents the auth your browser can't.
 
 ```bash
 npm run smoke         # headless end-to-end check against the mock
+npm run mock-csms     # (optional) run the mock CSMS standalone on ws://localhost:9000
 ```
 
 ## What works today (walking skeleton)
@@ -55,7 +60,9 @@ npm run smoke         # headless end-to-end check against the mock
   cert flow (`InstallCertificate`, `SignCertificate`, `Get15118EVCertificate`).
 - **Smart charging** — `SetChargingProfile` with a power-limit chart.
 - **Faults, multi-EVSE, reservations, scenario replay.**
-- **Hosted demo CSMS** (CitrineOS) so anyone can try it with zero setup.
+- **Demo CSMS** — ✅ shipped (a built-in mock runs in-process so anyone can try
+  it with zero setup); could upgrade to a full open-source CSMS (CitrineOS) for
+  more realistic behaviour.
 - **MED** — a sibling that speaks OCPP 1.6 (if SAL proves out).
 
 ## Layout

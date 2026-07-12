@@ -8,8 +8,21 @@
   const connectBtn = $('[data-connect-btn]');
   const autoscroll = $('[data-autoscroll]');
 
+  const section = $('[data-connect-section]');
   let ws = null;
   let connected = false;
+
+  // ---- demo / own mode toggle --------------------------------------------
+  document.querySelectorAll('[data-mode-toggle] .mode-btn').forEach((btn) => {
+    btn.addEventListener('click', () => {
+      if (connected) return; // don't switch mid-session
+      const mode = btn.dataset.mode;
+      section.className = 'connect mode-' + mode;
+      document
+        .querySelectorAll('[data-mode-toggle] .mode-btn')
+        .forEach((b) => b.classList.toggle('active', b === btn));
+    });
+  });
 
   // ---- relay socket -------------------------------------------------------
   function relayUrl() {
@@ -54,12 +67,16 @@
 
   function doConnect() {
     setConn('connecting');
-    sendRelay({
-      type: 'connect',
-      endpoint: $('#endpoint').value.trim(),
-      identity: $('#identity').value.trim(),
-      password: $('#password').value,
-    });
+    if (section.classList.contains('mode-demo')) {
+      sendRelay({ type: 'connect', demo: true, identity: 'SAL-DEMO' });
+    } else {
+      sendRelay({
+        type: 'connect',
+        endpoint: $('#endpoint').value.trim(),
+        identity: $('#identity').value.trim(),
+        password: $('#password').value,
+      });
+    }
   }
 
   // ---- station controls ---------------------------------------------------
