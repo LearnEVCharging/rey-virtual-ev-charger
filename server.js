@@ -16,7 +16,7 @@ import { extname, join, normalize } from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { dirname } from 'node:path';
 import { WebSocketServer } from 'ws';
-import { VirtualCharger } from './src/charger.js';
+import { createCharger, OCPP_VERSIONS } from './src/charger-factory.js';
 import { startMockCSMS } from './mock-csms/server.js';
 
 const __dirname = dirname(fileURLToPath(import.meta.url));
@@ -105,7 +105,8 @@ wss.on('connection', (browser) => {
           send({ type: 'error', message: 'Endpoint not allowed. Use wss:// (any) or ws://localhost.' });
           return;
         }
-        charger = new VirtualCharger({
+        const version = OCPP_VERSIONS.includes(msg.version) ? msg.version : '2.0.1';
+        charger = createCharger(version, {
           endpoint,
           identity: msg.identity || `CS-${Math.floor(Math.random() * 1e6)}`,
           password: msg.demo ? undefined : (msg.password || undefined),
@@ -114,7 +115,7 @@ wss.on('connection', (browser) => {
           onState: (state) => send({ type: 'state', state }),
         });
         await charger.connect();
-        send({ type: 'connected', identity: charger.identity, demo: !!msg.demo });
+        send({ type: 'connected', identity: charger.identity, demo: !!msg.demo, version });
         return;
       }
 

@@ -57,7 +57,14 @@ code { font-family: "SF Mono", Menlo, Consolas, monospace; background: rgba(0,0,
 .conn-pill.connecting { background: rgba(246,173,85,0.22); border-color: rgba(246,173,85,0.5); }
 
 .connect { padding: 18px 24px; background: var(--surface); border-bottom: 1px solid var(--line); }
-.mode-toggle { display: inline-flex; gap: 4px; margin-bottom: 14px; background: var(--bg); border: 1px solid var(--line); border-radius: 10px; padding: 4px; }
+.connect-toggles { display: flex; align-items: center; gap: 16px; flex-wrap: wrap; margin-bottom: 14px; }
+.mode-toggle { display: inline-flex; gap: 4px; background: var(--bg); border: 1px solid var(--line); border-radius: 10px; padding: 4px; }
+.ver-select { display: inline-flex; align-items: center; gap: 8px; }
+.ver-select-label { font-size: 12px; font-weight: 700; color: var(--muted); letter-spacing: 0.04em; text-transform: uppercase; }
+.ver-toggle { display: inline-flex; gap: 4px; background: var(--bg); border: 1px solid var(--line); border-radius: 10px; padding: 4px; }
+.ver-btn { border: none; background: transparent; color: var(--muted); font-size: 13px; font-weight: 600; padding: 7px 12px; border-radius: 7px; cursor: pointer; font-variant-numeric: tabular-nums; }
+.ver-btn.active { background: var(--surface); color: var(--navy); box-shadow: 0 1px 2px rgba(0,0,0,0.1); }
+.ver-btn:disabled { cursor: not-allowed; opacity: 0.55; }
 .mode-btn { border: none; background: transparent; color: var(--muted); font-size: 13px; font-weight: 600; padding: 7px 14px; border-radius: 7px; cursor: pointer; }
 .mode-btn.active { background: var(--surface); color: var(--navy); box-shadow: 0 1px 2px rgba(0,0,0,0.1); }
 .own-fields { display: contents; }

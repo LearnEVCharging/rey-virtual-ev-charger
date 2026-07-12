@@ -23,6 +23,7 @@ export class VirtualCharger {
     password,
     model = 'Rey-1',
     vendor = 'Learn EV Charging',
+    protocol = 'ocpp2.0.1',
     onLog = () => {},
     onState = () => {},
   }) {
@@ -30,6 +31,7 @@ export class VirtualCharger {
     this.identity = identity;
     this.model = model;
     this.vendor = vendor;
+    this.protocol = protocol;
     this.onLog = onLog;
     this.onState = onState;
 
@@ -58,7 +60,7 @@ export class VirtualCharger {
     this._pending = new Map(); // msgId -> action, to annotate CALLRESULT/CALLERROR
     this._txCounter = 0;
 
-    const opts = { endpoint, identity, protocols: ['ocpp2.0.1'] };
+    const opts = { endpoint, identity, protocols: [this.protocol] };
     if (password) opts.password = password; // HTTP Basic auth (security profile 1/2)
     this.client = new RPCClient(opts);
     this._wire();
@@ -113,7 +115,7 @@ export class VirtualCharger {
     c.on('connecting', () => this._setState({ connection: 'connecting' }));
     c.on('open', () => {
       this._setState({ connection: 'connected' });
-      this._note(`Connected to ${this.endpoint} as ${this.identity} (subprotocol ocpp2.0.1)`);
+      this._note(`Connected to ${this.endpoint} as ${this.identity} (subprotocol ${this.protocol})`);
     });
     c.on('close', () => {
       this._stopTimers();

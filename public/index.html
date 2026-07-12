@@ -4,6 +4,7 @@
 <meta charset="utf-8" />
 <meta name="viewport" content="width=device-width, initial-scale=1" />
 <title>Rey — Virtual OCPP Charge Point Simulator</title>
+<link rel="icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'%3E%3Ctext y='.9em' font-size='88'%3E%E2%9A%A1%3C/text%3E%3C/svg%3E" />
 <link rel="stylesheet" href="/style.css" />
 </head>
 <body>
@@ -11,7 +12,7 @@
   <div class="brand">
     <span class="bolt">⚡</span>
     <div>
-      <h1>Rey <span class="ver-badge" title="OCPP 1.6 and 2.1 coming">OCPP 2.0.1</span></h1>
+      <h1>Rey <span class="ver-badge" data-ver-badge title="Pick a version below — 1.6 / 2.0.1 / 2.1">OCPP 2.0.1</span></h1>
       <p>Virtual OCPP charge point — drive it, watch every frame.</p>
     </div>
   </div>
@@ -23,9 +24,19 @@
 </header>
 
 <section class="connect mode-demo" data-connect-section>
-  <div class="mode-toggle" data-mode-toggle>
-    <button type="button" class="mode-btn active" data-mode="demo">🎬 Explore — demo CSMS</button>
-    <button type="button" class="mode-btn" data-mode="own">🔌 Connect my CSMS</button>
+  <div class="connect-toggles">
+    <div class="mode-toggle" data-mode-toggle>
+      <button type="button" class="mode-btn active" data-mode="demo">🎬 Explore — demo CSMS</button>
+      <button type="button" class="mode-btn" data-mode="own">🔌 Connect my CSMS</button>
+    </div>
+    <div class="ver-select" data-ver-select>
+      <span class="ver-select-label">OCPP</span>
+      <div class="ver-toggle">
+        <button type="button" class="ver-btn" data-ver="1.6">1.6</button>
+        <button type="button" class="ver-btn active" data-ver="2.0.1">2.0.1</button>
+        <button type="button" class="ver-btn" data-ver="2.1">2.1</button>
+      </div>
+    </div>
   </div>
 
   <form class="connect-form" data-connect-form>
@@ -43,14 +54,14 @@
         <input id="password" name="password" type="password" placeholder="—" />
       </div>
     </div>
-    <p class="demo-note" data-demo-note>A built-in OCPP&nbsp;2.0.1 CSMS runs on the server — just hit <strong>Connect</strong> and drive the station. No backend of your own needed.</p>
+    <p class="demo-note" data-demo-note>A built-in OCPP&nbsp;<span data-demo-ver>2.0.1</span> CSMS runs on the server — just hit <strong>Connect</strong> and drive the station. No backend of your own needed.</p>
     <button type="submit" class="btn btn-primary" data-connect-btn>Connect</button>
   </form>
   <p class="hint" data-own-hint>Enter your CSMS's <code>wss://</code> URL, a station id, and a Basic-auth password if it needs one. The relay presents the auth headers your browser can't.</p>
 </section>
 
 <div class="cta-banner" data-cta hidden>
-  <span>🎉 Your CSMS just accepted a real OCPP 2.0.1 handshake. Want to build the whole thing — device model, transactions, smart charging, security?</span>
+  <span>🎉 Your CSMS just accepted a real OCPP <span data-cta-ver>2.0.1</span> handshake. Want to build the whole thing — device model, transactions, smart charging, security?</span>
   <a href="https://learnevcharging.com/courses/?utm_source=rey&amp;utm_medium=tool&amp;utm_campaign=aha" target="_blank" rel="noopener" class="btn btn-primary">Join the OCPP course waitlist →</a>
   <button type="button" class="cta-dismiss" data-cta-dismiss aria-label="Dismiss">×</button>
 </div>
@@ -77,7 +88,7 @@
       <button class="btn" data-act="stop" disabled>5 · Stop</button>
       <button class="btn" data-act="unplug" disabled>6 · Unplug</button>
     </div>
-    <p class="hint small">The CSMS can also drive the station — send it a RequestStartTransaction, Reset, TriggerMessage, or Get/SetVariables and watch Rey respond in the log.</p>
+    <p class="hint small">The CSMS can also drive the station — send it a remote start/stop, a Reset, or a TriggerMessage and watch Rey respond in the log.</p>
   </aside>
 
   <section class="panel log-panel">

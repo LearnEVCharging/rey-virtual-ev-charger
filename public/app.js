@@ -13,6 +13,25 @@
   let connected = false;
   let sessionDemo = true; // whether the current session is the built-in demo CSMS
   let ctaShown = false;
+  let version = '2.0.1'; // selected OCPP version — sent to the relay on connect
+
+  // ---- OCPP version selector ---------------------------------------------
+  function setVersionUI(v) {
+    version = v;
+    document.querySelectorAll('[data-ver-select] .ver-btn').forEach((b) =>
+      b.classList.toggle('active', b.dataset.ver === v)
+    );
+    const label = 'OCPP ' + v;
+    const badge = $('[data-ver-badge]');
+    if (badge) badge.textContent = label;
+    document.querySelectorAll('[data-demo-ver], [data-cta-ver]').forEach((el) => { el.textContent = v; });
+  }
+  document.querySelectorAll('[data-ver-select] .ver-btn').forEach((btn) => {
+    btn.addEventListener('click', () => {
+      if (connected) return; // don't switch mid-session
+      setVersionUI(btn.dataset.ver);
+    });
+  });
 
   // ---- demo / own mode toggle --------------------------------------------
   document.querySelectorAll('[data-mode-toggle] .mode-btn').forEach((btn) => {
@@ -81,13 +100,14 @@
   function doConnect() {
     setConn('connecting');
     if (section.classList.contains('mode-demo')) {
-      sendRelay({ type: 'connect', demo: true, identity: 'Rey-DEMO' });
+      sendRelay({ type: 'connect', demo: true, identity: 'Rey-DEMO', version });
     } else {
       sendRelay({
         type: 'connect',
         endpoint: $('#endpoint').value.trim(),
         identity: $('#identity').value.trim(),
         password: $('#password').value,
+        version,
       });
     }
   }
@@ -113,6 +133,10 @@
 
   function setControls() {
     document.querySelectorAll('[data-act]').forEach((b) => { b.disabled = !connected; });
+    // Lock the version + mode pickers during a live session.
+    document.querySelectorAll('[data-ver-select] .ver-btn, [data-mode-toggle] .mode-btn').forEach((b) => {
+      b.disabled = connected;
+    });
   }
 
   function renderState(s) {

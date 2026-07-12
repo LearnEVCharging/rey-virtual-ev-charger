@@ -3,7 +3,7 @@
   "version": "0.1.0",
   "private": true,
   "type": "module",
-  "description": "Rey — a browser-based virtual OCPP charge point (charge point simulator) you drive in the browser and connect to any CSMS. OCPP 2.0.1 today; 1.6 and 2.1 planned.",
+  "description": "Rey — a browser-based virtual OCPP charge point (charge point simulator) you drive in the browser and connect to any CSMS. Speaks OCPP 1.6, 2.0.1 and 2.1.",
   "scripts": {
     "start": "node server.js",
     "mock-csms": "node mock-csms/server.js",

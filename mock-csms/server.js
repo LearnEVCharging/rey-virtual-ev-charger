@@ -1,30 +1,63 @@
 /**
- * Minimal OCPP 2.0.1 CSMS for local testing of Rey.
+ * Minimal multi-version CSMS for local testing of Rey.
  *
- * This is NOT a real CSMS — it accepts any station and answers the core
- * messages so you can drive Rey end-to-end without CitrineOS running. Point Rey
- * at a real CSMS (CitrineOS, or your own) for the real thing.
+ * Speaks OCPP 1.6, 2.0.1 and 2.1 (whichever subprotocol the station negotiates)
+ * and answers the core messages so you can drive Rey end-to-end without a real
+ * CSMS running. It is NOT a real CSMS — it accepts every station and returns
+ * Accepted for everything. Point Rey at a real CSMS (CitrineOS, SteVe, or your
+ * own) for the real thing.
+ *
+ * The three versions share most responses (BootNotification, Heartbeat and
+ * StatusNotification answer identically), and differ where the message sets
+ * diverge: 1.6 carries a session with StartTransaction / MeterValues /
+ * StopTransaction and authorises a bare idTag, while 2.0.1 / 2.1 use the
+ * TransactionEvent lifecycle and an idToken object.
  */
 import { RPCServer, createRPCError } from 'ocpp-rpc';
 
 export async function startMockCSMS(port = 9000) {
-  const server = new RPCServer({ protocols: ['ocpp2.0.1'], strictMode: false });
+  const server = new RPCServer({
+    protocols: ['ocpp1.6', 'ocpp2.0.1', 'ocpp2.1'],
+    strictMode: false,
+  });
 
   // Accept every station. A real CSMS would check identity + password here.
   server.auth((accept, reject, handshake) => {
     accept({ identity: handshake.identity });
   });
 
-  server.on('client', (client) => {
-    console.log(`[mock-csms] ${client.identity} connected`);
+  // 1.6 makes the CSMS assign the transactionId; hand out simple ascending ints.
+  let nextTxId = 1000;
 
+  server.on('client', (client) => {
+    const proto = client.protocol || 'ocpp?';
+    console.log(`[mock-csms] ${client.identity} connected (${proto})`);
+
+    // ---- shared across all versions ------------------------------------
     client.handle('BootNotification', ({ params }) => {
-      console.log(`[mock-csms] BootNotification from ${client.identity}`, params?.chargingStation || '');
+      console.log(`[mock-csms] BootNotification from ${client.identity}`, params?.chargingStation || params?.chargePointModel || '');
       return { currentTime: new Date().toISOString(), interval: 30, status: 'Accepted' };
     });
     client.handle('Heartbeat', () => ({ currentTime: new Date().toISOString() }));
     client.handle('StatusNotification', () => ({}));
-    client.handle('Authorize', () => ({ idTokenInfo: { status: 'Accepted' } }));
+
+    // Authorize differs by version: 1.6 sends { idTag }, 2.0.1/2.1 send
+    // { idToken: {...} } and expect idTokenInfo back.
+    client.handle('Authorize', ({ params }) => {
+      if (params && 'idTag' in params) return { idTagInfo: { status: 'Accepted' } };
+      return { idTokenInfo: { status: 'Accepted' } };
+    });
+
+    // ---- OCPP 1.6 session -----------------------------------------------
+    client.handle('StartTransaction', () => ({
+      transactionId: ++nextTxId,
+      idTagInfo: { status: 'Accepted' },
+    }));
+    client.handle('MeterValues', () => ({}));
+    client.handle('StopTransaction', () => ({ idTagInfo: { status: 'Accepted' } }));
+    client.handle('DataTransfer', () => ({ status: 'Accepted' }));
+
+    // ---- OCPP 2.0.1 / 2.1 session ---------------------------------------
     client.handle('TransactionEvent', ({ params }) => {
       if (params?.eventType === 'Ended') return { totalCost: 4.2 };
       return {};
@@ -41,7 +74,7 @@ export async function startMockCSMS(port = 9000) {
   });
 
   await server.listen(port);
-  console.log(`[mock-csms] OCPP 2.0.1 CSMS listening on ws://localhost:${port}`);
+  console.log(`[mock-csms] OCPP 1.6 / 2.0.1 / 2.1 CSMS listening on ws://localhost:${port}`);
   return server;
 }
 
