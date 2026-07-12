@@ -1,4 +1,4 @@
-/* SAL browser client — talks to the relay over a WebSocket, renders the
+/* Rey browser client — talks to the relay over a WebSocket, renders the
    station controls and the live OCPP-J frame log. */
 (() => {
   const $ = (s) => document.querySelector(s);
@@ -11,6 +11,8 @@
   const section = $('[data-connect-section]');
   let ws = null;
   let connected = false;
+  let sessionDemo = true; // whether the current session is the built-in demo CSMS
+  let ctaShown = false;
 
   // ---- demo / own mode toggle --------------------------------------------
   document.querySelectorAll('[data-mode-toggle] .mode-btn').forEach((btn) => {
@@ -46,12 +48,23 @@
 
   // ---- inbound messages ---------------------------------------------------
   function handle(msg) {
-    if (msg.type === 'log') return renderEntry(msg.entry);
+    if (msg.type === 'log') { renderEntry(msg.entry); maybeShowCta(msg.entry); return; }
     if (msg.type === 'state') return renderState(msg.state);
-    if (msg.type === 'connected') { connected = true; setConn('connected'); setControls(); return; }
+    if (msg.type === 'connected') { connected = true; sessionDemo = !!msg.demo; ctaShown = false; setConn('connected'); setControls(); return; }
     if (msg.type === 'disconnected') { connected = false; setConn('disconnected'); setControls(); return; }
     if (msg.type === 'error') return renderNote('⚠ ' + msg.message, true);
   }
+
+  // The aha moment: a user's OWN CSMS accepting a real handshake = a course buyer.
+  // Show the waitlist CTA then (never in demo mode).
+  function maybeShowCta(e) {
+    if (ctaShown || sessionDemo) return;
+    if (e.kind === 'frame' && e.action === 'BootNotification' && e.frameType === 'CALLRESULT' && summarize(e) === 'Accepted') {
+      const cta = $('[data-cta]');
+      if (cta) { cta.hidden = false; ctaShown = true; }
+    }
+  }
+  $('[data-cta-dismiss]')?.addEventListener('click', () => { const c = $('[data-cta]'); if (c) c.hidden = true; });
 
   // ---- connection form ----------------------------------------------------
   form.addEventListener('submit', (e) => {
@@ -68,7 +81,7 @@
   function doConnect() {
     setConn('connecting');
     if (section.classList.contains('mode-demo')) {
-      sendRelay({ type: 'connect', demo: true, identity: 'SAL-DEMO' });
+      sendRelay({ type: 'connect', demo: true, identity: 'Rey-DEMO' });
     } else {
       sendRelay({
         type: 'connect',

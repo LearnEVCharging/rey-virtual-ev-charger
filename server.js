@@ -1,5 +1,5 @@
 /**
- * SAL relay — serves the browser UI and bridges each browser session to a real
+ * Rey relay — serves the browser UI and bridges each browser session to a real
  * CSMS over OCPP 2.0.1.
  *
  *   [ browser UI ] --ws--> [ this relay ] --wss/ws (ocpp2.0.1)--> [ CSMS ]
@@ -31,7 +31,7 @@ const DEMO_ENDPOINT = `ws://127.0.0.1:${MOCK_PORT}`;
 try {
   await startMockCSMS(MOCK_PORT);
 } catch (err) {
-  console.warn(`[SAL] built-in demo CSMS not started (${err.message}) — demo mode may be unavailable`);
+  console.warn(`[Rey] built-in demo CSMS not started (${err.message}) — demo mode may be unavailable`);
 }
 
 const MIME = {
@@ -109,7 +109,7 @@ wss.on('connection', (browser) => {
           endpoint,
           identity: msg.identity || `CS-${Math.floor(Math.random() * 1e6)}`,
           password: msg.demo ? undefined : (msg.password || undefined),
-          model: msg.model || 'SAL-1',
+          model: msg.model || 'Rey-1',
           onLog: (entry) => send({ type: 'log', entry }),
           onState: (state) => send({ type: 'state', state }),
         });
@@ -152,6 +152,6 @@ wss.on('connection', (browser) => {
 });
 
 httpServer.listen(PORT, () => {
-  console.log(`[SAL] relay + UI on http://localhost:${PORT}`);
-  console.log(`[SAL] built-in demo CSMS on ${DEMO_ENDPOINT} — "Explore" mode uses it, no setup needed`);
+  console.log(`[Rey] relay + UI on http://localhost:${PORT}`);
+  console.log(`[Rey] built-in demo CSMS on ${DEMO_ENDPOINT} — "Explore" mode uses it, no setup needed`);
 });

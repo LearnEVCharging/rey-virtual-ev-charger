@@ -1,9 +1,9 @@
 {
-  "name": "sal-virtual-charger",
+  "name": "rey-virtual-charge-point",
   "version": "0.1.0",
   "private": true,
   "type": "module",
-  "description": "SAL — a virtual OCPP 2.0.1 charge point you drive from the browser, connected to a real CSMS via a relay.",
+  "description": "Rey — a browser-based virtual OCPP charge point (charge point simulator) you drive in the browser and connect to any CSMS. OCPP 2.0.1 today; 1.6 and 2.1 planned.",
   "scripts": {
     "start": "node server.js",
     "mock-csms": "node mock-csms/server.js",

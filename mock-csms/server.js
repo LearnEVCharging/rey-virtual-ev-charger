@@ -1,8 +1,8 @@
 /**
- * Minimal OCPP 2.0.1 CSMS for local testing of SAL.
+ * Minimal OCPP 2.0.1 CSMS for local testing of Rey.
  *
  * This is NOT a real CSMS — it accepts any station and answers the core
- * messages so you can drive SAL end-to-end without CitrineOS running. Point SAL
+ * messages so you can drive Rey end-to-end without CitrineOS running. Point Rey
  * at a real CSMS (CitrineOS, or your own) for the real thing.
  */
 import { RPCServer, createRPCError } from 'ocpp-rpc';

@@ -7,7 +7,7 @@
  * Get/SetVariables, ChangeAvailability, GetBaseReport).
  *
  * Every OCPP-J frame in and out is surfaced through onLog(), and every state
- * change through onState() — that's what the browser UI (SAL) renders live.
+ * change through onState() — that's what the browser UI (Rey) renders live.
  *
  * This is the station side only. It connects to a CSMS that already exists
  * (a mock for local dev, or a real one like CitrineOS). It does NOT need a CPMS.
@@ -21,7 +21,7 @@ export class VirtualCharger {
     endpoint,
     identity,
     password,
-    model = 'SAL-1',
+    model = 'Rey-1',
     vendor = 'Learn EV Charging',
     onLog = () => {},
     onState = () => {},
@@ -178,7 +178,7 @@ export class VirtualCharger {
 
     // Anything we don't implement → CALLERROR NotSupported (recognized but unsupported).
     c.handle(({ method }) => {
-      throw createRPCError('NotSupported', `${method} is not supported by SAL`);
+      throw createRPCError('NotSupported', `${method} is not supported by Rey`);
     });
   }
 

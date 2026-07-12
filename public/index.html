@@ -3,7 +3,7 @@
 <head>
 <meta charset="utf-8" />
 <meta name="viewport" content="width=device-width, initial-scale=1" />
-<title>SAL — Virtual OCPP 2.0.1 Charge Point</title>
+<title>Rey — Virtual OCPP Charge Point Simulator</title>
 <link rel="stylesheet" href="/style.css" />
 </head>
 <body>
@@ -11,8 +11,8 @@
   <div class="brand">
     <span class="bolt">⚡</span>
     <div>
-      <h1>SAL</h1>
-      <p>Virtual OCPP&nbsp;2.0.1 charge point — drive it, watch every frame.</p>
+      <h1>Rey <span class="ver-badge" title="OCPP 1.6 and 2.1 coming">OCPP 2.0.1</span></h1>
+      <p>Virtual OCPP charge point — drive it, watch every frame.</p>
     </div>
   </div>
   <div class="topbar-right">
@@ -35,7 +35,7 @@
       </div>
       <div class="field">
         <label for="identity">Station ID</label>
-        <input id="identity" name="identity" value="SAL-001" />
+        <input id="identity" name="identity" value="Rey-001" />
       </div>
       <div class="field">
         <label for="password">Password <span class="opt">(Basic auth, optional)</span></label>
@@ -47,6 +47,12 @@
   </form>
   <p class="hint" data-own-hint>Enter your CSMS's <code>wss://</code> URL, a station id, and a Basic-auth password if it needs one. The relay presents the auth headers your browser can't.</p>
 </section>
+
+<div class="cta-banner" data-cta hidden>
+  <span>🎉 Your CSMS just accepted a real OCPP 2.0.1 handshake. Want to build the whole thing — device model, transactions, smart charging, security?</span>
+  <a href="https://learnevcharging.com/courses/?utm_source=rey&amp;utm_medium=tool&amp;utm_campaign=aha" target="_blank" rel="noopener" class="btn btn-primary">Join the OCPP course waitlist →</a>
+  <button type="button" class="cta-dismiss" data-cta-dismiss aria-label="Dismiss">×</button>
+</div>
 
 <main class="grid">
   <aside class="panel station">
@@ -70,7 +76,7 @@
       <button class="btn" data-act="stop" disabled>5 · Stop</button>
       <button class="btn" data-act="unplug" disabled>6 · Unplug</button>
     </div>
-    <p class="hint small">The CSMS can also drive the station — send it a RequestStartTransaction, Reset, TriggerMessage, or Get/SetVariables and watch SAL respond in the log.</p>
+    <p class="hint small">The CSMS can also drive the station — send it a RequestStartTransaction, Reset, TriggerMessage, or Get/SetVariables and watch Rey respond in the log.</p>
   </aside>
 
   <section class="panel log-panel">
@@ -86,8 +92,8 @@
 </main>
 
 <footer class="foot">
-  <span>SAL is a teaching + testing tool. It mocks the physical charger; it talks to a real CSMS.</span>
-  <a href="https://learnevcharging.com/tools/" target="_blank" rel="noopener">learnevcharging.com/tools</a>
+  <span>Rey is a free teaching + testing tool. Building a CSMS? <a href="https://learnevcharging.com/courses/?utm_source=rey&amp;utm_medium=tool&amp;utm_campaign=footer" target="_blank" rel="noopener">Join the OCPP course waitlist →</a></span>
+  <a href="https://learnevcharging.com/tools/?utm_source=rey&amp;utm_medium=tool&amp;utm_campaign=footer" target="_blank" rel="noopener">learnevcharging.com/tools</a>
 </footer>
 
 <script src="/app.js"></script>

@@ -45,6 +45,14 @@ code { font-family: "SF Mono", Menlo, Consolas, monospace; background: rgba(0,0,
   background: rgba(255,255,255,0.14); border: 1px solid rgba(255,255,255,0.3);
 }
 @media (max-width: 560px) { .home-link { display: none; } }
+.ver-badge { font-size: 11px; font-weight: 700; background: rgba(255,255,255,0.16); border: 1px solid rgba(255,255,255,0.35); color: #eaf3ff; padding: 2px 8px; border-radius: 999px; vertical-align: middle; margin-left: 8px; }
+
+.cta-banner { display: flex; align-items: center; gap: 16px; flex-wrap: wrap; padding: 14px 24px; background: linear-gradient(120deg, #eef5ff, #e0edff); border-bottom: 1px solid #cfe0ff; }
+.cta-banner[hidden] { display: none; }
+.cta-banner span { flex: 1; min-width: 240px; font-size: 14px; color: var(--navy); font-weight: 500; }
+.cta-banner .btn { flex: none; }
+.cta-dismiss { flex: none; background: none; border: none; font-size: 22px; color: var(--muted); cursor: pointer; line-height: 1; padding: 0 4px; }
+.cta-dismiss:hover { color: var(--ink); }
 .conn-pill.connected { background: rgba(61,220,132,0.22); border-color: rgba(61,220,132,0.5); }
 .conn-pill.connecting { background: rgba(246,173,85,0.22); border-color: rgba(246,173,85,0.5); }
 
