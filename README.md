@@ -63,15 +63,25 @@ npm run mock-csms     # (optional) run the mock CSMS standalone on ws://localhos
   values. Responds to `RequestStartTransaction`, `RequestStopTransaction`,
   `Reset`, `TriggerMessage`, `ChangeAvailability`, `GetVariables`, `SetVariables`,
   `GetBaseReport → NotifyReport`.
+- **Device model panel** — browse and edit the station's variables live (the flat
+  configuration keys in 1.6); the CSMS's `SetVariables` updates them in place.
+- **Certificate management (2.0.1 / 2.1)** — click *Request a certificate* and the
+  charge point generates a **real** RSA key pair + PKCS#10 CSR (`openssl`-verifiable)
+  and sends `SignCertificate`; the demo CSMS acts as a mini-CA, signs it, and returns
+  it over `CertificateSigned`. Rey installs it and shows every cert on the station
+  (subject, issuer, serial, validity, SHA-256 fingerprint). Also handles
+  `InstallCertificate`, `GetInstalledCertificateIds`, and `DeleteCertificate`. This is
+  the OCPP cert lifecycle (security profiles 2/3, and the rails PnC certs ride on) —
+  not the ISO 15118 EV-side handshake, which a browser tool can't do.
 - A live frame log with direction, CALL/CALLRESULT/CALLERROR badges, correlated
   message ids, and expandable JSON.
 - Relay guardrails: `wss://` (any) or `ws://localhost` only.
 
 ## Roadmap
 
-- **Device Model panel** — browse/edit components & variables live.
-- **Certificate store** — security profiles 1/2/3, mTLS, ISO 15118 Plug & Charge.
 - **Smart charging** — `SetChargingProfile` with a power-limit chart.
+- **mTLS transport** — present a client cert on the OCPP socket (security profile 3),
+  building on the certificate store already here.
 - **OCPP 2.1 extras** — bidirectional / V2X, DER control, battery swap.
 - Faults, multi-EVSE, reservations, scenario replay.
 - A headless npm package to wire Rey into CSMS CI suites.
@@ -84,7 +94,8 @@ src/charger-factory.js  createCharger(version, opts) — picks the right station
 src/charger.js          the virtual charge point state machine (OCPP 2.0.1)
 src/charger-16.js       the OCPP 1.6 station (StartTransaction / MeterValues / StopTransaction)
 src/charger-21.js       the OCPP 2.1 station (2.0.1 messages over the ocpp2.1 subprotocol)
-mock-csms/              a minimal multi-version CSMS (the built-in demo backend)
+src/certs.js            real X.509 crypto (key/CSR/CA-sign/parse) via node-forge
+mock-csms/              a minimal multi-version CSMS + mini-CA (the built-in demo backend)
 public/                 the browser UI (station console + live log)
 test/smoke.js           end-to-end check across all three versions
 ```

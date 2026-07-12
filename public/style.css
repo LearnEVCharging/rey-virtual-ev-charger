@@ -65,6 +65,30 @@ code { font-family: "SF Mono", Menlo, Consolas, monospace; background: rgba(0,0,
 .ver-btn { border: none; background: transparent; color: var(--muted); font-size: 13px; font-weight: 600; padding: 7px 12px; border-radius: 7px; cursor: pointer; font-variant-numeric: tabular-nums; }
 .ver-btn.active { background: var(--surface); color: var(--navy); box-shadow: 0 1px 2px rgba(0,0,0,0.1); }
 .ver-btn:disabled { cursor: not-allowed; opacity: 0.55; }
+
+/* Device model + certificate sub-panels (inside the Station column) */
+.sub-panel { margin-top: 16px; border: 1px solid var(--line); border-radius: 8px; background: var(--bg); }
+.sub-panel > summary { cursor: pointer; padding: 10px 12px; font-weight: 700; font-size: 13px; color: var(--navy); list-style: none; display: flex; align-items: center; gap: 8px; }
+.sub-panel > summary::-webkit-details-marker { display: none; }
+.sub-panel > summary::before { content: '▸'; color: var(--muted); font-size: 11px; }
+.sub-panel[open] > summary::before { content: '▾'; }
+.sub-panel > *:not(summary) { margin-left: 12px; margin-right: 12px; }
+.sub-panel > *:last-child { margin-bottom: 12px; }
+.sub-count { margin-left: auto; font-weight: 600; font-size: 11px; color: var(--muted); background: var(--surface); border: 1px solid var(--line); border-radius: 999px; padding: 1px 8px; }
+.dm-list { display: flex; flex-direction: column; gap: 6px; }
+.dm-row { display: grid; grid-template-columns: 1fr auto; gap: 8px; align-items: center; }
+.dm-row label { font-size: 12px; color: var(--ink); font-family: "SF Mono", Menlo, Consolas, monospace; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.dm-row input { width: 92px; font-size: 12px; padding: 4px 6px; border: 1px solid var(--line); border-radius: 6px; text-align: right; }
+.btn-cert { width: 100%; font-size: 13px; }
+.cert-list { display: flex; flex-direction: column; gap: 8px; margin-top: 10px; }
+.cert-card { border: 1px solid var(--line); border-left: 3px solid var(--green); border-radius: 8px; padding: 8px 10px; background: var(--surface); font-size: 12px; }
+.cert-card.root { border-left-color: var(--blue); }
+.cert-card .cert-cn { font-weight: 700; color: var(--navy); }
+.cert-card .cert-meta { color: var(--muted); margin-top: 2px; }
+.cert-card .cert-fp { font-family: "SF Mono", Menlo, Consolas, monospace; font-size: 10px; color: var(--muted); word-break: break-all; margin-top: 4px; }
+.cert-card .cert-type { display: inline-block; font-size: 10px; font-weight: 700; color: var(--green); text-transform: uppercase; letter-spacing: 0.04em; }
+.cert-card.root .cert-type { color: var(--blue); }
+.cert-empty { color: var(--muted); font-size: 12px; }
 .mode-btn { border: none; background: transparent; color: var(--muted); font-size: 13px; font-weight: 600; padding: 7px 14px; border-radius: 7px; cursor: pointer; }
 .mode-btn.active { background: var(--surface); color: var(--navy); box-shadow: 0 1px 2px rgba(0,0,0,0.1); }
 .own-fields { display: contents; }

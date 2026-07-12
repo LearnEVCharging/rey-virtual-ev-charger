@@ -113,6 +113,8 @@ wss.on('connection', (browser) => {
           model: msg.model || 'Rey-1',
           onLog: (entry) => send({ type: 'log', entry }),
           onState: (state) => send({ type: 'state', state }),
+          onVars: (vars) => send({ type: 'vars', vars }),
+          onCerts: (certs) => send({ type: 'certs', certs }),
         });
         await charger.connect();
         send({ type: 'connected', identity: charger.identity, demo: !!msg.demo, version });
@@ -133,6 +135,11 @@ wss.on('connection', (browser) => {
         case 'stop': await charger.stopTransaction(); break;
         case 'unplug': await charger.unplug(); break;
         case 'status': await charger.setStatus(msg.status || 'Available'); break;
+        case 'setVariable': charger.setLocalVariable(msg.key, msg.value); break;
+        case 'requestCertificate':
+          if (typeof charger.requestCertificate === 'function') await charger.requestCertificate();
+          else send({ type: 'error', message: 'Certificate management is an OCPP 2.0.1 / 2.1 feature.' });
+          break;
         case 'disconnect':
           await charger.disconnect();
           charger = null;

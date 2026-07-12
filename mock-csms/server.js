@@ -14,12 +14,16 @@
  * TransactionEvent lifecycle and an idToken object.
  */
 import { RPCServer, createRPCError } from 'ocpp-rpc';
+import { createCA, signCsr } from '../src/certs.js';
 
 export async function startMockCSMS(port = 9000) {
   const server = new RPCServer({
     protocols: ['ocpp1.6', 'ocpp2.0.1', 'ocpp2.1'],
     strictMode: false,
   });
+
+  // A throwaway root CA so the demo CSMS can sign charge-point CSRs for real.
+  const ca = createCA();
 
   // Accept every station. A real CSMS would check identity + password here.
   server.auth((accept, reject, handshake) => {
@@ -64,6 +68,30 @@ export async function startMockCSMS(port = 9000) {
     });
     client.handle('NotifyReport', () => ({}));
     client.handle('NotifyEvent', () => ({}));
+
+    // ---- certificate management (OCPP 2.0.1 / 2.1) ----------------------
+    // The station sends a CSR; we sign it into a real cert and hand it back
+    // via CertificateSigned, then ask what it now has installed.
+    client.handle('SignCertificate', ({ params }) => {
+      console.log(`[mock-csms] SignCertificate (CSR) from ${client.identity}`);
+      let chainPem;
+      try {
+        chainPem = signCsr(params.csr, ca.caCertPem, ca.caKeyPem);
+      } catch (err) {
+        console.log(`[mock-csms] CSR rejected: ${err.message}`);
+        return { status: 'Rejected' };
+      }
+      setTimeout(async () => {
+        try {
+          await client.call('CertificateSigned', { certificateChain: chainPem, certificateType: 'ChargingStationCertificate' });
+          const ids = await client.call('GetInstalledCertificateIds', {});
+          console.log(`[mock-csms] ${client.identity} now reports ${ids?.certificateHashDataChain?.length || 0} installed cert(s)`);
+        } catch (err) {
+          console.log(`[mock-csms] cert delivery failed: ${err.message}`);
+        }
+      }, 100);
+      return { status: 'Accepted' };
+    });
 
     // Anything else → CALLERROR NotImplemented (like a real minimal CSMS).
     client.handle(({ method }) => {

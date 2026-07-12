@@ -25,6 +25,9 @@
     const badge = $('[data-ver-badge]');
     if (badge) badge.textContent = label;
     document.querySelectorAll('[data-demo-ver], [data-cta-ver]').forEach((el) => { el.textContent = v; });
+    // Certificate management is an OCPP 2.0.1 / 2.1 feature — hide it for 1.6.
+    const certPanel = $('[data-cert-panel]');
+    if (certPanel) certPanel.style.display = v === '1.6' ? 'none' : '';
   }
   document.querySelectorAll('[data-ver-select] .ver-btn').forEach((btn) => {
     btn.addEventListener('click', () => {
@@ -69,9 +72,67 @@
   function handle(msg) {
     if (msg.type === 'log') { renderEntry(msg.entry); maybeShowCta(msg.entry); return; }
     if (msg.type === 'state') return renderState(msg.state);
+    if (msg.type === 'vars') return renderVars(msg.vars);
+    if (msg.type === 'certs') return renderCerts(msg.certs);
     if (msg.type === 'connected') { connected = true; sessionDemo = !!msg.demo; ctaShown = false; setConn('connected'); setControls(); return; }
-    if (msg.type === 'disconnected') { connected = false; setConn('disconnected'); setControls(); return; }
+    if (msg.type === 'disconnected') { connected = false; setConn('disconnected'); setControls(); clearPanels(); return; }
     if (msg.type === 'error') return renderNote('⚠ ' + msg.message, true);
+  }
+
+  // ---- device model + certificates ---------------------------------------
+  function renderVars(vars) {
+    const list = $('[data-dm-list]');
+    const count = $('[data-dm-count]');
+    if (count) count.textContent = vars.length ? String(vars.length) : '';
+    if (!list) return;
+    list.innerHTML = '';
+    vars.forEach((v) => {
+      const row = document.createElement('div');
+      row.className = 'dm-row';
+      const label = v.component ? `${v.component}/${v.variable}` : v.variable;
+      row.innerHTML = `<label title="${escapeHtml(label)}">${escapeHtml(label)}</label>`;
+      const input = document.createElement('input');
+      input.value = v.value == null ? '' : v.value;
+      input.setAttribute('aria-label', label);
+      input.addEventListener('change', () => {
+        sendRelay({ type: 'action', action: 'setVariable', key: v.key, value: input.value });
+      });
+      row.appendChild(input);
+      list.appendChild(row);
+    });
+  }
+
+  function renderCerts(certs) {
+    const list = $('[data-cert-list]');
+    const count = $('[data-cert-count]');
+    if (count) count.textContent = certs.length ? String(certs.length) : '';
+    if (!list) return;
+    if (!certs.length) {
+      list.innerHTML = '<p class="cert-empty">No certificates installed yet. Click “Request a certificate”.</p>';
+      return;
+    }
+    list.innerHTML = '';
+    certs.forEach((c) => {
+      const isRoot = /Root/.test(c.type) || c.selfSigned;
+      const card = document.createElement('div');
+      card.className = 'cert-card' + (isRoot ? ' root' : '');
+      card.innerHTML =
+        `<span class="cert-type">${escapeHtml(c.type || 'certificate')}</span>` +
+        `<div class="cert-cn">${escapeHtml(c.subject || '')}</div>` +
+        `<div class="cert-meta">issuer: ${escapeHtml(c.issuer || '')} · serial ${escapeHtml((c.serialNumber || '').slice(0, 16))}</div>` +
+        `<div class="cert-meta">valid ${escapeHtml((c.notBefore || '').slice(0, 10))} → ${escapeHtml((c.notAfter || '').slice(0, 10))}</div>` +
+        `<div class="cert-fp">SHA-256 ${escapeHtml(c.fingerprint || '')}</div>`;
+      list.appendChild(card);
+    });
+    const panel = $('[data-cert-panel]');
+    if (panel) panel.open = true; // surface it once a cert lands
+  }
+
+  function clearPanels() {
+    const dm = $('[data-dm-list]'); if (dm) dm.innerHTML = '';
+    const cl = $('[data-cert-list]'); if (cl) cl.innerHTML = '';
+    const dc = $('[data-dm-count]'); if (dc) dc.textContent = '';
+    const cc = $('[data-cert-count]'); if (cc) cc.textContent = '';
   }
 
   // The aha moment: a user's OWN CSMS accepting a real handshake = a course buyer.

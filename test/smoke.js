@@ -70,13 +70,55 @@ async function runVersion(version) {
   return ok;
 }
 
+// Certificate management + device model (OCPP 2.0.1).
+async function runCertAndVars() {
+  console.log('\n=== Certificate management + device model (2.0.1) ===');
+  const frames = [];
+  let certs = [];
+  let vars = [];
+  const charger = createCharger('2.0.1', {
+    endpoint: `ws://localhost:${PORT}`,
+    identity: 'CS-CERT',
+    onLog: (e) => { if (e.kind === 'frame') frames.push(e.action); },
+    onCerts: (c) => { certs = c; },
+    onVars: (v) => { vars = v; },
+  });
+  await charger.connect();
+  await charger.boot();
+
+  // Device model: edit a variable locally and confirm it takes.
+  const key = 'OCPPCommCtrlr/HeartbeatInterval';
+  charger.setLocalVariable(key, '600');
+  const edited = vars.find((v) => v.key === key)?.value === '600';
+
+  // Certificate: generate a real CSR, get it signed, install it.
+  await charger.requestCertificate();
+  await wait(600); // CSMS signs + delivers CertificateSigned + lists ids
+
+  const actions = new Set(frames);
+  const gotSignReq = actions.has('SignCertificate');
+  const gotSigned = actions.has('CertificateSigned');
+  const gotList = actions.has('GetInstalledCertificateIds');
+  const installed = certs.length > 0;
+  const leaf = certs.find((c) => !/Root/.test(c.type));
+
+  const ok = edited && gotSignReq && gotSigned && gotList && installed && !!leaf?.fingerprint;
+  console.log(`  device model edit took: ${edited}`);
+  console.log(`  SignCertificate sent: ${gotSignReq} | CertificateSigned received: ${gotSigned} | GetInstalledCertificateIds: ${gotList}`);
+  console.log(`  certificates installed: ${certs.length}${leaf ? ` (leaf ${leaf.subject}, issuer ${leaf.issuer})` : ''}`);
+  console.log(`  ${ok ? '✓ PASS' : '✗ FAIL'}`);
+  await charger.disconnect();
+  return ok;
+}
+
 let allOk = true;
 try {
   for (const version of ['1.6', '2.0.1', '2.1']) {
     const ok = await runVersion(version);
     allOk = allOk && ok;
   }
-  console.log(`\n${allOk ? '✓ ALL VERSIONS PASS' : '✗ SOME VERSIONS FAILED'}`);
+  allOk = (await runCertAndVars()) && allOk;
+  console.log(`\n${allOk ? '✓ ALL CHECKS PASS' : '✗ SOME CHECKS FAILED'}`);
   await server.close();
   process.exit(allOk ? 0 : 1);
 } catch (err) {

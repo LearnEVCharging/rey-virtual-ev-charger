@@ -26,6 +26,8 @@ export class VirtualCharger16 {
     vendor = 'Learn EV Charging',
     onLog = () => {},
     onState = () => {},
+    onVars = () => {},
+    onCerts = () => {},
   }) {
     this.endpoint = endpoint;
     this.identity = identity;
@@ -34,6 +36,8 @@ export class VirtualCharger16 {
     this.protocol = 'ocpp1.6';
     this.onLog = onLog;
     this.onState = onState;
+    this.onVars = onVars;
+    this.onCerts = onCerts;
 
     this.state = {
       connection: 'disconnected',
@@ -95,6 +99,8 @@ export class VirtualCharger16 {
     c.on('open', () => {
       this._setState({ connection: 'connected' });
       this._note(`Connected to ${this.endpoint} as ${this.identity} (subprotocol ocpp1.6)`);
+      this._pushVars();
+      this.onCerts([]); // OCPP 1.6 has no certificate-management messages
     });
     c.on('close', () => {
       this._stopTimers();
@@ -124,7 +130,7 @@ export class VirtualCharger16 {
       return { status: 'Accepted' };
     });
     c.handle('ChangeConfiguration', ({ params }) => {
-      if (params?.key) this.config[params.key] = params.value;
+      if (params?.key) { this.config[params.key] = params.value; this._pushVars(); }
       return { status: 'Accepted' };
     });
     c.handle('GetConfiguration', ({ params }) => {
@@ -275,5 +281,23 @@ export class VirtualCharger16 {
       case 'BootNotification': return this.boot('Triggered').catch(() => {});
       default: this._note(`No trigger handler for ${requested}`);
     }
+  }
+
+  // ---- configuration (the 1.6 equivalent of a device model) --------------
+  // 1.6 configuration is flat key/value, so there is no component — the UI
+  // renders these the same way it renders 2.0.1 device-model variables.
+  _varsList() {
+    return Object.entries(this.config).map(([key, value]) => ({ key, component: '', variable: key, value }));
+  }
+
+  _pushVars() {
+    this.onVars(this._varsList());
+  }
+
+  setLocalVariable(key, value) {
+    if (!(key in this.config)) return;
+    this.config[key] = value;
+    this._pushVars();
+    this._note(`Set ${key} = ${value} locally`);
   }
 }

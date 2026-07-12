@@ -13,6 +13,7 @@
  * (a mock for local dev, or a real one like CitrineOS). It does NOT need a CPMS.
  */
 import { RPCClient, createRPCError } from 'ocpp-rpc';
+import { generateKeyAndCsr, splitPemChain, summarizeCert, certHashData } from './certs.js';
 
 const FRAME_NAME = { 2: 'CALL', 3: 'CALLRESULT', 4: 'CALLERROR' };
 
@@ -26,6 +27,8 @@ export class VirtualCharger {
     protocol = 'ocpp2.0.1',
     onLog = () => {},
     onState = () => {},
+    onVars = () => {},
+    onCerts = () => {},
   }) {
     this.endpoint = endpoint;
     this.identity = identity;
@@ -34,6 +37,8 @@ export class VirtualCharger {
     this.protocol = protocol;
     this.onLog = onLog;
     this.onState = onState;
+    this.onVars = onVars;
+    this.onCerts = onCerts;
 
     this.state = {
       connection: 'disconnected',
@@ -54,6 +59,10 @@ export class VirtualCharger {
       'AuthCtrlr/AuthorizeRemoteStart': 'true',
       'DeviceDataCtrlr/BytesPerMessageGetReport': '0',
     };
+
+    // Installed certificates (real X.509, from CertificateSigned / InstallCertificate).
+    this.certificates = [];
+    this._pendingKeyPem = null; // private key held on the CP after we send a CSR
 
     this._hbTimer = null;
     this._meterTimer = null;
@@ -116,6 +125,8 @@ export class VirtualCharger {
     c.on('open', () => {
       this._setState({ connection: 'connected' });
       this._note(`Connected to ${this.endpoint} as ${this.identity} (subprotocol ${this.protocol})`);
+      this._pushVars();
+      this._pushCerts();
     });
     c.on('close', () => {
       this._stopTimers();
@@ -171,11 +182,45 @@ export class VirtualCharger {
         this.variables[key] = d.attributeValue;
         return { attributeStatus: 'Accepted', component: d.component, variable: d.variable };
       });
+      this._pushVars();
       return { setVariableResult: results };
     });
     c.handle('GetBaseReport', ({ params }) => {
       setTimeout(() => this._sendBaseReport(params?.requestId), 50);
       return { status: 'Accepted' };
+    });
+
+    // ---- certificate management (security profiles 2/3, PnC rails) --------
+    // The CSMS returns the signed certificate for a CSR the CP sent earlier.
+    c.handle('CertificateSigned', ({ params }) => {
+      const n = this._installCertChain(params?.certificateChain || '', params?.certificateType || 'ChargingStationCertificate', true);
+      this._note(`Installed ${n} certificate(s) from CertificateSigned — the CP now holds a signed cert`);
+      this._pendingKeyPem = null;
+      return { status: n > 0 ? 'Accepted' : 'Rejected' };
+    });
+    // The CSMS installs a root/CA certificate into the CP trust store.
+    c.handle('InstallCertificate', ({ params }) => {
+      const n = this._installCertChain(params?.certificate || '', params?.certificateType || 'CSMSRootCertificate', false);
+      this._note(`Installed a ${params?.certificateType || 'root'} certificate`);
+      return { status: n > 0 ? 'Accepted' : 'Failed' };
+    });
+    // The CSMS asks which certificates the CP has installed.
+    c.handle('GetInstalledCertificateIds', ({ params }) => {
+      const wanted = params?.certificateType;
+      const list = this.certificates.filter((cert) => !wanted || !wanted.length || wanted.includes(cert.type));
+      if (!list.length) return { status: 'NotFound' };
+      return {
+        status: 'Accepted',
+        certificateHashDataChain: list.map((cert) => ({ certificateType: cert.type, certificateHashData: cert.hashData })),
+      };
+    });
+    // The CSMS removes an installed certificate by its hash data.
+    c.handle('DeleteCertificate', ({ params }) => {
+      const serial = params?.certificateHashData?.serialNumber;
+      const before = this.certificates.length;
+      this.certificates = this.certificates.filter((cert) => cert.hashData.serialNumber !== serial);
+      this._pushCerts();
+      return { status: this.certificates.length < before ? 'Accepted' : 'NotFound' };
     });
 
     // Anything we don't implement → CALLERROR NotSupported (recognized but unsupported).
@@ -357,5 +402,74 @@ export class VirtualCharger {
         reportData,
       })
       .catch(() => {});
+  }
+
+  // ---- device model (browse/edit variables live) -------------------------
+  _varsList() {
+    return Object.entries(this.variables).map(([key, value]) => {
+      const [component, variable] = key.split('/');
+      return { key, component, variable, value };
+    });
+  }
+
+  _pushVars() {
+    this.onVars(this._varsList());
+  }
+
+  // Edit a variable locally (as if changed on the station), then re-render.
+  setLocalVariable(key, value) {
+    if (!(key in this.variables)) return;
+    this.variables[key] = value;
+    this._pushVars();
+    this._note(`Set ${key} = ${value} locally`);
+  }
+
+  // ---- certificate management --------------------------------------------
+  // Generate a real key pair + CSR on the charge point and send SignCertificate.
+  async requestCertificate() {
+    this._note('Generating an RSA-2048 key pair and a PKCS#10 CSR on the charge point…');
+    const { privateKeyPem, csrPem } = generateKeyAndCsr({
+      commonName: this.identity || 'Rey-001',
+      organization: this.vendor,
+    });
+    this._pendingKeyPem = privateKeyPem; // stays on the CP; only the CSR is sent
+    const res = await this.client.call('SignCertificate', {
+      csr: csrPem,
+      certificateType: 'ChargingStationCertificate',
+    });
+    this._note(
+      res?.status === 'Accepted'
+        ? 'CSMS accepted the CSR — awaiting CertificateSigned with the signed certificate'
+        : `CSMS ${res?.status || 'did not accept'} the CSR`
+    );
+    return res;
+  }
+
+  // Parse a PEM chain and add each certificate to the store.
+  _installCertChain(pem, type, leafFirst) {
+    const parts = splitPemChain(pem);
+    parts.forEach((certPem, i) => {
+      const t = leafFirst && i === 0 ? type : 'CSMSRootCertificate';
+      const issuerPem = parts[i + 1] || certPem; // leaf's issuer is the next (CA); root is self-signed
+      let summary;
+      let hashData;
+      try {
+        summary = summarizeCert(certPem);
+        hashData = certHashData(certPem, issuerPem);
+      } catch {
+        return; // skip anything that isn't a parseable certificate
+      }
+      this.certificates.push({ type: t, certPem, summary, hashData });
+    });
+    this._pushCerts();
+    return this.certificates.length ? parts.length : 0;
+  }
+
+  _certList() {
+    return this.certificates.map((c) => ({ type: c.type, pem: c.certPem, ...c.summary }));
+  }
+
+  _pushCerts() {
+    this.onCerts(this._certList());
   }
 }

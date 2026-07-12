@@ -89,6 +89,19 @@
       <button class="btn" data-act="unplug" disabled>6 · Unplug</button>
     </div>
     <p class="hint small">The CSMS can also drive the station — send it a remote start/stop, a Reset, or a TriggerMessage and watch Rey respond in the log.</p>
+
+    <details class="sub-panel" data-dm-panel open>
+      <summary>Device model <span class="sub-count" data-dm-count></span></summary>
+      <p class="hint small" data-dm-hint>Connect to load the device model. Edit a value to change it on the station, or send GetVariables/SetVariables from the CSMS.</p>
+      <div class="dm-list" data-dm-list></div>
+    </details>
+
+    <details class="sub-panel" data-cert-panel open>
+      <summary>Certificates <span class="sub-count" data-cert-count></span></summary>
+      <p class="hint small">The charge point generates a <strong>real</strong> RSA key + CSR; the demo CSMS signs it and returns the certificate over <code>CertificateSigned</code>. Watch the raw frames in the log.</p>
+      <button class="btn btn-cert" data-act="requestCertificate" disabled>Request a certificate (SignCertificate)</button>
+      <div class="cert-list" data-cert-list></div>
+    </details>
   </aside>
 
   <section class="panel log-panel">
