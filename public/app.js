@@ -101,26 +101,53 @@
     scroll();
   }
 
+  // Pull the headline field out of a frame (status / connectorStatus / eventType)
+  // so the key result — e.g. BootNotification → "Accepted" — shows without expanding.
+  function summarize(e) {
+    try {
+      const arr = JSON.parse(e.raw);
+      const payload = e.type === 2 ? arr[3] : e.type === 3 ? arr[2] : null;
+      if (payload && typeof payload === 'object') {
+        const v =
+          payload.status ||
+          payload.connectorStatus ||
+          payload.eventType ||
+          (payload.idTokenInfo && payload.idTokenInfo.status);
+        if (v) return String(v);
+      }
+    } catch {}
+    return '';
+  }
+
   function renderEntry(e) {
     if (e.kind === 'note') return renderNote(e.text, false);
     const badgeCls = { CALL: 'call', CALLRESULT: 'result', CALLERROR: 'error' }[e.frameType] || 'call';
     const div = document.createElement('div');
-    div.className = `entry entry--${e.dir}`;
+    div.className = `entry entry--${e.dir} open`; // open by default — the JSON is the point
+    const sum = summarize(e);
     div.innerHTML =
       `<div class="entry-head">` +
         `<span class="dir">${e.dir === 'out' ? 'CS ▶ CSMS' : 'CSMS ▶ CS'}</span>` +
         `<span class="badge badge--${badgeCls}">${e.frameType}</span>` +
         (e.action ? `<span class="action">${escapeHtml(e.action)}</span>` : '') +
+        (sum ? `<span class="summary">${escapeHtml(sum)}</span>` : '') +
         `<span class="msgid">${escapeHtml(e.id || '')}</span>` +
+        `<span class="entry-toggle" data-toggle>hide ▾</span>` +
       `</div>` +
       `<div class="entry-body"><pre>${highlight(e.raw)}</pre></div>`;
-    div.querySelector('.entry-head').addEventListener('click', () => div.classList.toggle('open'));
+    div.querySelector('.entry-head').addEventListener('click', () => {
+      div.classList.toggle('open');
+      div.querySelector('[data-toggle]').textContent = div.classList.contains('open') ? 'hide ▾' : 'show ▸';
+    });
     logEl.appendChild(div);
     scroll();
   }
 
   function scroll() {
-    if (autoscroll.checked) logEl.scrollTop = logEl.scrollHeight;
+    if (autoscroll.checked) {
+      const last = logEl.lastElementChild;
+      if (last) last.scrollIntoView({ block: 'nearest' });
+    }
   }
 
   // ---- helpers ------------------------------------------------------------

@@ -87,7 +87,7 @@ code { font-family: "SF Mono", Menlo, Consolas, monospace; background: rgba(0,0,
 .log-head { display: flex; align-items: center; justify-content: space-between; margin-bottom: 12px; }
 .log-tools { display: flex; align-items: center; gap: 14px; }
 .chk { font-size: 12px; color: var(--muted); display: flex; align-items: center; gap: 5px; }
-.log { display: flex; flex-direction: column; gap: 8px; max-height: 66vh; overflow-y: auto; }
+.log { display: flex; flex-direction: column; gap: 8px; }
 
 .entry { border: 1px solid var(--line); border-radius: 8px; overflow: hidden; }
 .entry--in { border-left: 3px solid #334e68; }
@@ -101,9 +101,12 @@ code { font-family: "SF Mono", Menlo, Consolas, monospace; background: rgba(0,0,
 .badge--result { background: rgba(26,127,82,0.16); color: var(--green); }
 .badge--error { background: rgba(192,21,47,0.13); color: var(--red); }
 .action { font-family: "SF Mono", Menlo, monospace; font-size: 12px; font-weight: 700; color: var(--navy); }
+.summary { font-size: 11px; font-weight: 700; padding: 1px 8px; border-radius: 999px; background: rgba(26,127,82,0.14); color: var(--green); }
 .msgid { font-family: "SF Mono", Menlo, monospace; font-size: 11px; color: var(--muted); margin-left: auto; }
-.entry-body { display: none; background: var(--code-bg); color: var(--code-ink); padding: 12px 14px; overflow-x: auto; }
-.entry.open .entry-body { display: block; }
+.entry-body { display: none; background: var(--code-bg); color: var(--code-ink); padding: 12px 14px; overflow: auto; }
+/* Open by default and fully visible; only very tall frames cap + scroll within. */
+.entry.open .entry-body { display: block; max-height: 480px; }
+.entry-toggle { margin-left: 8px; font-size: 11px; color: var(--muted); font-weight: 600; }
 .entry-body pre { margin: 0; font-family: "SF Mono", Menlo, monospace; font-size: 12px; line-height: 1.5; white-space: pre; }
 .note-text { padding: 8px 12px; font-size: 13px; color: var(--muted); }
 
