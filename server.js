@@ -123,6 +123,7 @@ wss.on('connection', (browser) => {
           onState: (state) => send({ type: 'state', state }),
           onVars: (vars) => send({ type: 'vars', vars }),
           onCerts: (certs) => send({ type: 'certs', certs }),
+          onLocalList: (list) => send({ type: 'localList', list }),
         });
         await charger.connect();
         send({ type: 'connected', identity: charger.identity, demo: !!msg.demo, version });
@@ -157,6 +158,20 @@ wss.on('connection', (browser) => {
             await charger.requestCertificate();
           }
           break;
+        case 'authorizePnC':
+          if (typeof charger.authorizePnC === 'function') await charger.authorizePnC(msg.eMAID || 'DE-REY-C12345-3');
+          else send({ type: 'error', message: 'Plug & Charge requires OCPP 2.0.1 or 2.1.' });
+          break;
+        case 'appStart':
+          if (isDemo && mockCsms?.triggerRemoteStart) {
+            mockCsms.triggerRemoteStart(charger.identity, msg.idToken || 'APP-START-01');
+          } else {
+            send({ type: 'error', message: 'App/remote start is driven by the CSMS — in "Connect my CSMS" mode, trigger it from your backend.' });
+          }
+          break;
+        case 'addLocalAuth': charger.addLocalAuth?.(msg.token); break;
+        case 'removeLocalAuth': charger.removeLocalAuth?.(msg.token); break;
+        case 'setAuthMode': charger.authMode = msg.mode || 'rfid'; break;
         case 'disconnect':
           await charger.disconnect();
           charger = null;

@@ -91,6 +91,29 @@ code { font-family: "SF Mono", Menlo, Consolas, monospace; background: rgba(0,0,
 .cert-card.tier-root .cert-type { color: var(--blue); }
 .cert-card.tier-intermediate .cert-type { color: var(--amber); }
 .cert-empty { color: var(--muted); font-size: 12px; }
+
+/* Authentication mode selector (RFID / App / Plug & Charge) */
+.auth-mode { display: flex; align-items: center; gap: 8px; margin: 4px 0 10px; flex-wrap: wrap; }
+.auth-mode-label { font-size: 12px; font-weight: 700; color: var(--muted); letter-spacing: 0.03em; text-transform: uppercase; }
+.auth-toggle { display: inline-flex; gap: 4px; background: var(--bg); border: 1px solid var(--line); border-radius: 10px; padding: 4px; flex-wrap: wrap; }
+.auth-btn { border: none; background: transparent; color: var(--muted); font-size: 12px; font-weight: 600; padding: 6px 10px; border-radius: 7px; cursor: pointer; }
+.auth-btn.active { background: var(--surface); color: var(--navy); box-shadow: 0 1px 2px rgba(0,0,0,0.1); }
+.auth-btn:disabled { opacity: 0.4; cursor: not-allowed; }
+.auth-step { display: contents; }
+.auth-variant { display: flex; gap: 6px; }
+.auth-variant[hidden] { display: none; }
+.auth-variant input { flex: 1; min-width: 0; padding: 8px 10px; border: 1px solid var(--line); border-radius: 8px; font-size: 13px; }
+.pnc-note { color: var(--amber); }
+
+/* Local authorization list (whitelist) */
+.local-add { display: flex; gap: 6px; margin: 4px 0 8px; }
+.local-add input { flex: 1; min-width: 0; padding: 8px 10px; border: 1px solid var(--line); border-radius: 8px; font-size: 13px; }
+.btn-small { font-size: 12px; padding: 6px 12px; flex: none; }
+.local-list { display: flex; flex-direction: column; gap: 4px; }
+.local-row { display: flex; align-items: center; justify-content: space-between; gap: 8px; background: var(--surface); border: 1px solid var(--line); border-radius: 7px; padding: 5px 8px; font-size: 12px; }
+.local-token { font-family: "SF Mono", Menlo, Consolas, monospace; color: var(--navy); word-break: break-all; }
+.local-rm { border: none; background: none; color: var(--muted); font-size: 16px; line-height: 1; cursor: pointer; padding: 0 2px; flex: none; }
+.local-rm:hover { color: var(--red); }
 .mode-btn { border: none; background: transparent; color: var(--muted); font-size: 13px; font-weight: 600; padding: 7px 14px; border-radius: 7px; cursor: pointer; }
 .mode-btn.active { background: var(--surface); color: var(--navy); box-shadow: 0 1px 2px rgba(0,0,0,0.1); }
 .own-fields { display: contents; }

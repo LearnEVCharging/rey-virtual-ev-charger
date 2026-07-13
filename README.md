@@ -63,16 +63,26 @@ npm run mock-csms     # (optional) run the mock CSMS standalone on ws://localhos
   values. Responds to `RequestStartTransaction`, `RequestStopTransaction`,
   `Reset`, `TriggerMessage`, `ChangeAvailability`, `GetVariables`, `SetVariables`,
   `GetBaseReport → NotifyReport`.
+- **Authentication modes** — pick **RFID**, **App** (CSMS-driven remote start), or
+  **Plug & Charge**. PnC (OCPP 2.0.1/2.1) authorises by **eMAID** and sends
+  `Get15118EVCertificate` + `Authorize` — the OCPP-visible half of PnC is real; the
+  ISO 15118 EV↔charger leg itself is represented, not wire-accurate (a browser can't
+  do it).
+- **Local Authorization List** — whitelist an RFID/eMAID on the station and it
+  authorises **locally** (no `Authorize` sent to the backend — how a station stays
+  usable offline); unknown tokens still go to the CSMS. Also handles `SendLocalList`.
 - **Device model panel** — browse and edit the station's variables live (the flat
   configuration keys in 1.6); the CSMS's `SetVariables` updates them in place.
-- **Certificate management (2.0.1 / 2.1)** — click *Request a certificate* and the
-  charge point generates a **real** RSA key pair + PKCS#10 CSR (`openssl`-verifiable)
-  and sends `SignCertificate`; the demo CSMS acts as a mini-CA, signs it, and returns
-  it over `CertificateSigned`. Rey installs it and shows every cert on the station
-  (subject, issuer, serial, validity, SHA-256 fingerprint). Also handles
-  `InstallCertificate`, `GetInstalledCertificateIds`, and `DeleteCertificate`. This is
-  the OCPP cert lifecycle (security profiles 2/3, and the rails PnC certs ride on) —
-  not the ISO 15118 EV-side handshake, which a browser tool can't do.
+- **Certificate management (all three versions)** — click *Request a certificate* and
+  the charge point generates a **real** RSA key pair + PKCS#10 CSR (`openssl`-verifiable)
+  and sends `SignCertificate`; the demo CSMS drives the full sequence — installs the
+  **root** trust anchor (`InstallCertificate`), then returns the signed **leaf chain**
+  (`CertificateSigned`: leaf → Sub-CA 2 → Sub-CA 1 from a real 3-tier PKI). Rey shows
+  every cert on the station by tier (subject, issuer, serial, validity, SHA-256
+  fingerprint). Also handles `GetInstalledCertificateIds` and `DeleteCertificate`. On
+  **OCPP 1.6** this rides the Security Whitepaper extension (`ExtendedTriggerMessage`,
+  `SignChargePointCertificate`). This is the OCPP cert lifecycle (security profiles 2/3,
+  and the rails PnC certs ride on) — not the ISO 15118 EV-side handshake.
 - A live frame log with direction, CALL/CALLRESULT/CALLERROR badges, correlated
   message ids, and expandable JSON.
 - Relay guardrails: `wss://` (any) or `ws://localhost` only.

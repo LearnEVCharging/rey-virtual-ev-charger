@@ -90,18 +90,29 @@ export async function startMockCSMS(port = 9000) {
         console.log(`[mock-csms] CSR rejected: ${err.message}`);
         return { status: 'Rejected' };
       }
+      const is16 = (client.protocol || '') === 'ocpp1.6';
       setTimeout(async () => {
         try {
-          await client.call('InstallCertificate', { certificateType: 'V2GRootCertificate', certificate: pkiChain.rootPem });
-          await client.call('CertificateSigned', { certificateChain: signed.chainPem, certificateType: 'ChargingStationCertificate' });
+          await client.call('InstallCertificate', {
+            certificateType: is16 ? 'CentralSystemRootCertificate' : 'V2GRootCertificate',
+            certificate: pkiChain.rootPem,
+          });
+          await client.call('CertificateSigned', {
+            certificateChain: signed.chainPem,
+            certificateType: is16 ? 'ChargePointCertificate' : 'ChargingStationCertificate',
+          });
           const ids = await client.call('GetInstalledCertificateIds', {});
-          console.log(`[mock-csms] ${client.identity} now reports ${ids?.certificateHashDataChain?.length || 0} installed cert(s)`);
+          const n = (ids?.certificateHashDataChain || ids?.certificateHashData || []).length;
+          console.log(`[mock-csms] ${client.identity} now reports ${n} installed cert(s)`);
         } catch (err) {
           console.log(`[mock-csms] cert delivery failed: ${err.message}`);
         }
       }, 100);
       return { status: 'Accepted' };
     });
+
+    // Plug & Charge: the station asks us for the EV's 15118 contract certificate.
+    client.handle('Get15118EVCertificate', () => ({ status: 'Accepted', exiResponse: 'gA==' }));
 
     // Anything else → CALLERROR NotImplemented (like a real minimal CSMS).
     client.handle(({ method }) => {
@@ -117,7 +128,25 @@ export async function startMockCSMS(port = 9000) {
   server.triggerCertProvisioning = (identity) => {
     const client = clients.get(identity);
     if (!client) return false;
-    client.call('TriggerMessage', { requestedMessage: 'SignChargingStationCertificate' }).catch(() => {});
+    // 1.6 uses the security-extension ExtendedTriggerMessage + "ChargePoint" naming.
+    if ((client.protocol || '') === 'ocpp1.6') {
+      client.call('ExtendedTriggerMessage', { requestedMessage: 'SignChargePointCertificate' }).catch(() => {});
+    } else {
+      client.call('TriggerMessage', { requestedMessage: 'SignChargingStationCertificate' }).catch(() => {});
+    }
+    return true;
+  };
+
+  // App/remote start: the CSMS asks a station to begin a session (RequestStart in
+  // 2.0.1/2.1, RemoteStartTransaction in 1.6). Used for the "App" auth mode.
+  server.triggerRemoteStart = (identity, token = 'APP-START-01') => {
+    const client = clients.get(identity);
+    if (!client) return false;
+    if ((client.protocol || '') === 'ocpp1.6') {
+      client.call('RemoteStartTransaction', { idTag: token }).catch(() => {});
+    } else {
+      client.call('RequestStartTransaction', { idToken: { idToken: token, type: 'Central' }, remoteStartId: 1 }).catch(() => {});
+    }
     return true;
   };
 

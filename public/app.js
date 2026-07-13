@@ -14,6 +14,7 @@
   let sessionDemo = true; // whether the current session is the built-in demo CSMS
   let ctaShown = false;
   let version = '2.0.1'; // selected OCPP version — sent to the relay on connect
+  let authMode = 'rfid'; // rfid | app | pnc (Plug & Charge)
 
   // ---- OCPP version selector ---------------------------------------------
   function setVersionUI(v) {
@@ -25,15 +26,37 @@
     const badge = $('[data-ver-badge]');
     if (badge) badge.textContent = label;
     document.querySelectorAll('[data-demo-ver], [data-cta-ver]').forEach((el) => { el.textContent = v; });
-    // Certificate management is an OCPP 2.0.1 / 2.1 feature — hide it for 1.6.
-    const certPanel = $('[data-cert-panel]');
-    if (certPanel) certPanel.style.display = v === '1.6' ? 'none' : '';
+    // Certificates work in all three versions (1.6 via the Security Whitepaper extension).
+    const note16 = $('[data-cert-16-note]');
+    if (note16) note16.hidden = v !== '1.6';
+    // Plug & Charge is OCPP 2.0.1+ — disable it (and revert to RFID) on 1.6.
+    const pncAllowed = v !== '1.6';
+    const pncBtn = $('[data-authmode="pnc"]');
+    const pncNote = $('[data-pnc-note]');
+    if (pncBtn) pncBtn.disabled = !pncAllowed;
+    if (pncNote) pncNote.hidden = pncAllowed;
+    if (!pncAllowed && authMode === 'pnc') setAuthMode('rfid');
   }
   document.querySelectorAll('[data-ver-select] .ver-btn').forEach((btn) => {
     btn.addEventListener('click', () => {
       if (connected) return; // don't switch mid-session
       setVersionUI(btn.dataset.ver);
     });
+  });
+
+  // ---- authentication mode (RFID / App / Plug & Charge) ------------------
+  function setAuthMode(m) {
+    authMode = m;
+    document.querySelectorAll('[data-auth-mode] .auth-btn').forEach((b) =>
+      b.classList.toggle('active', b.dataset.authmode === m)
+    );
+    document.querySelectorAll('[data-auth-step] .auth-variant').forEach((v) => {
+      v.hidden = v.dataset.variant !== m;
+    });
+    sendRelay({ type: 'action', action: 'setAuthMode', mode: m });
+  }
+  document.querySelectorAll('[data-auth-mode] .auth-btn').forEach((btn) => {
+    btn.addEventListener('click', () => { if (!btn.disabled) setAuthMode(btn.dataset.authmode); });
   });
 
   // ---- demo / own mode toggle --------------------------------------------
@@ -74,6 +97,7 @@
     if (msg.type === 'state') return renderState(msg.state);
     if (msg.type === 'vars') return renderVars(msg.vars);
     if (msg.type === 'certs') return renderCerts(msg.certs);
+    if (msg.type === 'localList') return renderLocalList(msg.list);
     if (msg.type === 'connected') { connected = true; sessionDemo = !!msg.demo; ctaShown = false; setConn('connected'); setControls(); return; }
     if (msg.type === 'disconnected') { connected = false; setConn('disconnected'); setControls(); clearPanels(); return; }
     if (msg.type === 'error') return renderNote('⚠ ' + msg.message, true);
@@ -136,11 +160,41 @@
   }
 
   function clearPanels() {
-    const dm = $('[data-dm-list]'); if (dm) dm.innerHTML = '';
-    const cl = $('[data-cert-list]'); if (cl) cl.innerHTML = '';
-    const dc = $('[data-dm-count]'); if (dc) dc.textContent = '';
-    const cc = $('[data-cert-count]'); if (cc) cc.textContent = '';
+    ['[data-dm-list]', '[data-cert-list]', '[data-local-list]'].forEach((s) => { const el = $(s); if (el) el.innerHTML = ''; });
+    ['[data-dm-count]', '[data-cert-count]', '[data-local-count]'].forEach((s) => { const el = $(s); if (el) el.textContent = ''; });
   }
+
+  // ---- local authorization list (whitelist) ------------------------------
+  function renderLocalList(list) {
+    const el = $('[data-local-list]');
+    const count = $('[data-local-count]');
+    if (count) count.textContent = list.length ? String(list.length) : '';
+    if (!el) return;
+    if (!list.length) { el.innerHTML = '<p class="cert-empty">No whitelisted tokens. Add one above to authorize it locally, no backend call.</p>'; return; }
+    el.innerHTML = '';
+    list.forEach((token) => {
+      const row = document.createElement('div');
+      row.className = 'local-row';
+      row.innerHTML = `<span class="local-token">${escapeHtml(token)}</span>`;
+      const rm = document.createElement('button');
+      rm.className = 'local-rm';
+      rm.type = 'button';
+      rm.textContent = '×';
+      rm.setAttribute('aria-label', 'Remove ' + token);
+      rm.addEventListener('click', () => sendRelay({ type: 'action', action: 'removeLocalAuth', token }));
+      row.appendChild(rm);
+      el.appendChild(row);
+    });
+  }
+  function addLocalToken() {
+    const input = $('[data-local-input]');
+    const token = input?.value.trim();
+    if (!token) return;
+    sendRelay({ type: 'action', action: 'addLocalAuth', token });
+    input.value = '';
+  }
+  $('[data-local-add]')?.addEventListener('click', addLocalToken);
+  $('[data-local-input]')?.addEventListener('keydown', (e) => { if (e.key === 'Enter') { e.preventDefault(); addLocalToken(); } });
 
   // The aha moment: a user's OWN CSMS accepting a real handshake = a course buyer.
   // Show the waitlist CTA then (never in demo mode).
@@ -185,7 +239,12 @@
     btn.addEventListener('click', () => {
       const action = btn.dataset.act;
       const payload = { type: 'action', action };
-      if (action === 'authorize' || action === 'start') payload.idToken = $('[data-idtoken]').value.trim();
+      const rfid = () => $('[data-idtoken]')?.value.trim();
+      const emaid = () => $('[data-emaid]')?.value.trim();
+      if (action === 'authorize') payload.idToken = rfid();
+      if (action === 'authorizePnC') payload.eMAID = emaid();
+      if (action === 'appStart') payload.idToken = 'APP-START-01';
+      if (action === 'start') payload.idToken = authMode === 'pnc' ? emaid() : rfid();
       sendRelay(payload);
     });
   });
@@ -200,7 +259,7 @@
   }
 
   function setControls() {
-    document.querySelectorAll('[data-act]').forEach((b) => { b.disabled = !connected; });
+    document.querySelectorAll('[data-act], [data-local-add]').forEach((b) => { b.disabled = !connected; });
     // Lock the version + mode pickers during a live session.
     document.querySelectorAll('[data-ver-select] .ver-btn, [data-mode-toggle] .mode-btn').forEach((b) => {
       b.disabled = connected;

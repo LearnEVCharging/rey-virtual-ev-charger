@@ -76,29 +76,60 @@
       <div class="state"><span class="state-k">Power</span><span class="state-v" data-power>0 W</span></div>
     </div>
 
+    <div class="auth-mode" data-auth-mode>
+      <span class="auth-mode-label">Authentication</span>
+      <div class="auth-toggle">
+        <button type="button" class="auth-btn active" data-authmode="rfid">RFID</button>
+        <button type="button" class="auth-btn" data-authmode="app">App</button>
+        <button type="button" class="auth-btn" data-authmode="pnc" title="Plug &amp; Charge — OCPP 2.0.1+">Plug &amp; Charge</button>
+      </div>
+    </div>
+
     <div class="controls">
       <button class="btn" data-act="boot" disabled>1 · Boot</button>
       <button class="btn" data-act="plugIn" disabled>2 · Plug in</button>
-      <div class="rfid">
-        <input data-idtoken value="045A2B3C4D5E80" aria-label="RFID id token" />
-        <button class="btn" data-act="authorize" disabled>3 · Tap RFID</button>
+
+      <div class="auth-step" data-auth-step>
+        <div class="auth-variant" data-variant="rfid">
+          <input data-idtoken value="045A2B3C4D5E80" aria-label="RFID id token" />
+          <button class="btn" data-act="authorize" disabled>3 · Tap RFID</button>
+        </div>
+        <div class="auth-variant" data-variant="app" hidden>
+          <button class="btn" data-act="appStart" disabled>3 · Start from app (remote)</button>
+        </div>
+        <div class="auth-variant" data-variant="pnc" hidden>
+          <input data-emaid value="DE-REY-C12345-3" aria-label="eMAID contract id" />
+          <button class="btn" data-act="authorizePnC" disabled>3 · Authorize (Plug &amp; Charge)</button>
+        </div>
       </div>
+
       <button class="btn" data-act="start" disabled>4 · Start charging</button>
       <button class="btn" data-act="meter" disabled>Send meter value</button>
       <button class="btn" data-act="stop" disabled>5 · Stop</button>
       <button class="btn" data-act="unplug" disabled>6 · Unplug</button>
     </div>
+    <p class="hint small pnc-note" data-pnc-note hidden>Plug &amp; Charge is an OCPP 2.0.1+ feature — switch the version above to try it.</p>
     <p class="hint small">The CSMS can also drive the station — send it a remote start/stop, a Reset, or a TriggerMessage and watch Rey respond in the log.</p>
 
-    <details class="sub-panel" data-dm-panel open>
+    <details class="sub-panel" data-local-panel>
+      <summary>Local auth list <span class="sub-count" data-local-count></span></summary>
+      <p class="hint small">Whitelist an RFID/eMAID and the charge point authorizes it <strong>locally</strong> — no <code>Authorize</code> is sent to the backend (that's how a station keeps working offline). Unknown tokens still go to the CSMS.</p>
+      <div class="local-add">
+        <input data-local-input placeholder="RFID or eMAID to whitelist" aria-label="Token to whitelist" />
+        <button class="btn btn-small" data-local-add disabled>Add</button>
+      </div>
+      <div class="local-list" data-local-list></div>
+    </details>
+
+    <details class="sub-panel" data-dm-panel>
       <summary>Device model <span class="sub-count" data-dm-count></span></summary>
       <p class="hint small" data-dm-hint>Connect to load the device model. Edit a value to change it on the station, or send GetVariables/SetVariables from the CSMS.</p>
       <div class="dm-list" data-dm-list></div>
     </details>
 
-    <details class="sub-panel" data-cert-panel open>
+    <details class="sub-panel" data-cert-panel>
       <summary>Certificates <span class="sub-count" data-cert-count></span></summary>
-      <p class="hint small">The demo CSMS sends a <code>TriggerMessage</code> → the charge point generates a <strong>real</strong> RSA key + CSR (<code>SignCertificate</code>) → the CSMS installs the root trust anchor (<code>InstallCertificate</code>) and returns the signed leaf chain (<code>CertificateSigned</code>). Watch every frame in the log.</p>
+      <p class="hint small">The CSMS drives provisioning: the charge point generates a <strong>real</strong> RSA key + CSR (<code>SignCertificate</code>), the CSMS installs the root trust anchor (<code>InstallCertificate</code>) and returns the signed leaf chain (<code>CertificateSigned</code>). Watch every frame in the log. <span data-cert-16-note hidden>On OCPP&nbsp;1.6 this is the Security Whitepaper extension (<code>ExtendedTriggerMessage</code>).</span></p>
       <button class="btn btn-cert" data-act="requestCertificate" disabled>Request a certificate (SignCertificate)</button>
       <div class="cert-list" data-cert-list></div>
     </details>

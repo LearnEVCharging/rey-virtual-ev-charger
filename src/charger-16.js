@@ -14,6 +14,7 @@
  * on purpose: reading this file shows a full 1.6 charger end to end.
  */
 import { RPCClient, createRPCError } from 'ocpp-rpc';
+import { generateKeyAndCsr, splitPemChain, summarizeCert, certHashData } from './certs.js';
 
 const FRAME_NAME = { 2: 'CALL', 3: 'CALLRESULT', 4: 'CALLERROR' };
 
@@ -28,16 +29,19 @@ export class VirtualCharger16 {
     onState = () => {},
     onVars = () => {},
     onCerts = () => {},
+    onLocalList = () => {},
   }) {
     this.endpoint = endpoint;
     this.identity = identity;
     this.model = model;
     this.vendor = vendor;
     this.protocol = 'ocpp1.6';
+    this.authMode = 'rfid'; // rfid | app (Plug & Charge is OCPP 2.0.1+)
     this.onLog = onLog;
     this.onState = onState;
     this.onVars = onVars;
     this.onCerts = onCerts;
+    this.onLocalList = onLocalList;
 
     this.state = {
       connection: 'disconnected',
@@ -59,6 +63,13 @@ export class VirtualCharger16 {
       AuthorizeRemoteTxRequests: 'true',
       NumberOfConnectors: '1',
     };
+
+    // Certificate management (OCPP 1.6 Security Whitepaper extension).
+    this.certificates = [];
+    this._pendingKeyPem = null;
+
+    // Local Authorization List (SendLocalList / offline auth) — whitelisted idTags.
+    this.localAuthList = [];
 
     this._hbTimer = null;
     this._meterTimer = null;
@@ -100,7 +111,8 @@ export class VirtualCharger16 {
       this._setState({ connection: 'connected' });
       this._note(`Connected to ${this.endpoint} as ${this.identity} (subprotocol ocpp1.6)`);
       this._pushVars();
-      this.onCerts([]); // OCPP 1.6 has no certificate-management messages
+      this._pushCerts();
+      this._pushLocalList();
     });
     c.on('close', () => {
       this._stopTimers();
@@ -150,6 +162,52 @@ export class VirtualCharger16 {
     });
     c.handle('UnlockConnector', () => ({ status: 'Unlocked' }));
     c.handle('DataTransfer', () => ({ status: 'Accepted' }));
+
+    // ---- OCPP 1.6 Security Whitepaper extension: certificate management ---
+    // Not in core 1.6 — these come from the "Improved security for OCPP 1.6-J"
+    // whitepaper, which uses ExtendedTriggerMessage + "Charge Point" naming.
+    c.handle('ExtendedTriggerMessage', ({ params }) => {
+      this._note(`CSMS sent an ExtendedTriggerMessage (${params?.requestedMessage})`);
+      setTimeout(() => this._handleTrigger(params?.requestedMessage), 50);
+      return { status: 'Accepted' };
+    });
+    c.handle('CertificateSigned', ({ params }) => {
+      this.certificates = this.certificates.filter((cert) => cert.tier !== 'leaf');
+      const n = this._installCertChain(params?.certificateChain || '', 'ChargePointCertificate', 'signed');
+      this._note(`Installed the signed leaf chain (${n} cert(s): leaf + intermediate sub-CAs)`);
+      this._pendingKeyPem = null;
+      return { status: n > 0 ? 'Accepted' : 'Rejected' };
+    });
+    c.handle('InstallCertificate', ({ params }) => {
+      const n = this._installCertChain(params?.certificate || '', params?.certificateType || 'CentralSystemRootCertificate', 'root');
+      this._note(`Installed the ${params?.certificateType || 'root'} trust anchor`);
+      return { status: n > 0 ? 'Accepted' : 'Failed' };
+    });
+    c.handle('GetInstalledCertificateIds', ({ params }) => {
+      const wanted = params?.certificateType;
+      const list = this.certificates.filter((cert) => !wanted || cert.type === wanted || cert.tier === 'root');
+      if (!list.length) return { status: 'NotFound' };
+      return { status: 'Accepted', certificateHashData: list.map((cert) => cert.hashData) };
+    });
+    c.handle('DeleteCertificate', ({ params }) => {
+      const serial = params?.certificateHashData?.serialNumber;
+      const before = this.certificates.length;
+      this.certificates = this.certificates.filter((cert) => cert.hashData.serialNumber !== serial);
+      this._pushCerts();
+      return { status: this.certificates.length < before ? 'Accepted' : 'NotFound' };
+    });
+
+    // ---- OCPP 1.6 Local Authorization List -------------------------------
+    c.handle('SendLocalList', ({ params }) => {
+      if (params?.updateType === 'Full') this.localAuthList = [];
+      (params?.localAuthorizationList || []).forEach((e) => {
+        if (e?.idTag) this._addLocal(e.idTag);
+      });
+      this._pushLocalList();
+      this._note(`CSMS sent a ${params?.updateType || ''} Local Authorization List (${this.localAuthList.length} entries)`);
+      return { status: 'Accepted' };
+    });
+    c.handle('GetLocalListVersion', () => ({ listVersion: this.localAuthList.length ? 1 : 0 }));
 
     c.handle(({ method }) => {
       throw createRPCError('NotImplemented', `${method} is not supported by Rey (OCPP 1.6)`);
@@ -207,6 +265,10 @@ export class VirtualCharger16 {
 
   async authorize(idTag) {
     this._setState({ idToken: idTag });
+    if (this._isWhitelisted(idTag)) {
+      this._note(`"${idTag}" is on the Local Authorization List — authorized locally, no Authorize sent to the CSMS`);
+      return { idTagInfo: { status: 'Accepted' } };
+    }
     return this.client.call('Authorize', { idTag });
   }
 
@@ -279,6 +341,7 @@ export class VirtualCharger16 {
       case 'Heartbeat': return this.client.call('Heartbeat', {}).catch(() => {});
       case 'StatusNotification': return this.setStatus(this.state.connectorStatus).catch(() => {});
       case 'BootNotification': return this.boot('Triggered').catch(() => {});
+      case 'SignChargePointCertificate': return this.requestCertificate().catch(() => {});
       default: this._note(`No trigger handler for ${requested}`);
     }
   }
@@ -300,4 +363,45 @@ export class VirtualCharger16 {
     this._pushVars();
     this._note(`Set ${key} = ${value} locally`);
   }
+
+  // ---- certificate management (1.6 Security Whitepaper extension) ---------
+  async requestCertificate() {
+    this._note('Generating an RSA-2048 key pair and a PKCS#10 CSR on the charge point…');
+    const { privateKeyPem, csrPem } = generateKeyAndCsr({ commonName: this.identity || 'Rey-CP', organization: this.vendor });
+    this._pendingKeyPem = privateKeyPem;
+    const res = await this.client.call('SignCertificate', { csr: csrPem });
+    this._note(res?.status === 'Accepted' ? 'CSMS accepted the CSR — awaiting CertificateSigned' : `CSMS ${res?.status || 'did not accept'} the CSR`);
+    return res;
+  }
+
+  _installCertChain(pem, type, kind) {
+    const parts = splitPemChain(pem);
+    let parsed = 0;
+    parts.forEach((certPem, i) => {
+      let summary;
+      let hashData;
+      try { summary = summarizeCert(certPem); hashData = certHashData(certPem, parts[i + 1] || certPem); }
+      catch { return; }
+      parsed++;
+      if (this.certificates.some((c) => c.summary.fingerprint === summary.fingerprint)) return;
+      let tier;
+      let t;
+      if (kind === 'root') { tier = 'root'; t = type || 'CentralSystemRootCertificate'; }
+      else if (i === 0) { tier = 'leaf'; t = type || 'ChargePointCertificate'; }
+      else { tier = 'intermediate'; t = 'SubCA'; }
+      this.certificates.push({ type: t, tier, certPem, summary, hashData });
+    });
+    this._pushCerts();
+    return parsed;
+  }
+
+  _certList() { return this.certificates.map((c) => ({ type: c.type, tier: c.tier, pem: c.certPem, ...c.summary })); }
+  _pushCerts() { this.onCerts(this._certList()); }
+
+  // ---- Local Authorization List ------------------------------------------
+  _isWhitelisted(token) { return this.localAuthList.includes(token); }
+  _addLocal(token) { if (token && !this.localAuthList.includes(token)) this.localAuthList.push(token); }
+  addLocalAuth(token) { if (!token || this.localAuthList.includes(token)) return; this.localAuthList.push(token); this._pushLocalList(); this._note(`Added "${token}" to the Local Authorization List`); }
+  removeLocalAuth(token) { this.localAuthList = this.localAuthList.filter((t) => t !== token); this._pushLocalList(); }
+  _pushLocalList() { this.onLocalList([...this.localAuthList]); }
 }

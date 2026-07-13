@@ -29,16 +29,19 @@ export class VirtualCharger {
     onState = () => {},
     onVars = () => {},
     onCerts = () => {},
+    onLocalList = () => {},
   }) {
     this.endpoint = endpoint;
     this.identity = identity;
     this.model = model;
     this.vendor = vendor;
     this.protocol = protocol;
+    this.authMode = 'rfid'; // rfid | app | pnc (Plug & Charge)
     this.onLog = onLog;
     this.onState = onState;
     this.onVars = onVars;
     this.onCerts = onCerts;
+    this.onLocalList = onLocalList;
 
     this.state = {
       connection: 'disconnected',
@@ -63,6 +66,9 @@ export class VirtualCharger {
     // Installed certificates (real X.509, from CertificateSigned / InstallCertificate).
     this.certificates = [];
     this._pendingKeyPem = null; // private key held on the CP after we send a CSR
+
+    // Local Authorization List (SendLocalList / offline auth) — whitelisted idTokens.
+    this.localAuthList = [];
 
     this._hbTimer = null;
     this._meterTimer = null;
@@ -127,6 +133,7 @@ export class VirtualCharger {
       this._note(`Connected to ${this.endpoint} as ${this.identity} (subprotocol ${this.protocol})`);
       this._pushVars();
       this._pushCerts();
+      this._pushLocalList();
     });
     c.on('close', () => {
       this._stopTimers();
@@ -224,6 +231,16 @@ export class VirtualCharger {
       return { status: this.certificates.length < before ? 'Accepted' : 'NotFound' };
     });
 
+    // ---- Local Authorization List (offline / local auth) ------------------
+    c.handle('SendLocalList', ({ params }) => {
+      if (params?.updateType === 'Full') this.localAuthList = [];
+      (params?.localAuthorizationList || []).forEach((e) => { if (e?.idToken?.idToken) this._addLocal(e.idToken.idToken); });
+      this._pushLocalList();
+      this._note(`CSMS sent a ${params?.updateType || ''} Local Authorization List (${this.localAuthList.length} entries)`);
+      return { status: 'Accepted' };
+    });
+    c.handle('GetLocalListVersion', () => ({ versionNumber: this.localAuthList.length ? 1 : 0 }));
+
     // Anything we don't implement → CALLERROR NotSupported (recognized but unsupported).
     c.handle(({ method }) => {
       throw createRPCError('NotSupported', `${method} is not supported by Rey`);
@@ -291,7 +308,33 @@ export class VirtualCharger {
 
   async authorize(idToken, type = 'ISO14443') {
     this._setState({ idToken });
+    if (this._isWhitelisted(idToken)) {
+      this._note(`"${idToken}" is on the Local Authorization List — authorized locally, no Authorize sent to the CSMS`);
+      return { idTokenInfo: { status: 'Accepted' } };
+    }
     return this.client.call('Authorize', { idToken: { idToken, type } });
+  }
+
+  // Plug & Charge (ISO 15118): the car presents a contract certificate; the
+  // charge point validates it via OCPP and authorizes by eMAID — no RFID tap.
+  // The 15118 EV↔charger leg itself is out of a browser's reach, so it's noted;
+  // everything the charge point does over OCPP (Get15118EVCertificate, Authorize
+  // with an eMAID idToken) is real.
+  async authorizePnC(eMAID = 'DE-REY-C12345-3') {
+    this._note(`EV presented an ISO 15118 contract certificate (eMAID ${eMAID}) — Plug & Charge`);
+    this._setState({ idToken: eMAID });
+    await this.client
+      .call('Get15118EVCertificate', {
+        iso15118SchemaVersion: 'urn:iso:15118:2:2013:MsgDef',
+        action: 'Install',
+        exiRequest: 'gA==', // placeholder EXI — the 15118 leg is represented, not wire-accurate
+      })
+      .catch(() => {});
+    if (this._isWhitelisted(eMAID)) {
+      this._note(`eMAID ${eMAID} is on the Local Authorization List — authorized locally`);
+      return { idTokenInfo: { status: 'Accepted' } };
+    }
+    return this.client.call('Authorize', { idToken: { idToken: eMAID, type: 'eMAID' } });
   }
 
   async startTransaction(idToken = 'LOCAL01', triggerReason = 'Authorized', remoteStartId) {
@@ -484,4 +527,19 @@ export class VirtualCharger {
   _pushCerts() {
     this.onCerts(this._certList());
   }
+
+  // ---- Local Authorization List ------------------------------------------
+  _isWhitelisted(token) { return this.localAuthList.includes(token); }
+  _addLocal(token) { if (token && !this.localAuthList.includes(token)) this.localAuthList.push(token); }
+  addLocalAuth(token) {
+    if (!token || this.localAuthList.includes(token)) return;
+    this.localAuthList.push(token);
+    this._pushLocalList();
+    this._note(`Added "${token}" to the Local Authorization List`);
+  }
+  removeLocalAuth(token) {
+    this.localAuthList = this.localAuthList.filter((t) => t !== token);
+    this._pushLocalList();
+  }
+  _pushLocalList() { this.onLocalList([...this.localAuthList]); }
 }

@@ -117,6 +117,69 @@ async function runCertAndVars() {
   return ok;
 }
 
+// Certificate management over the OCPP 1.6 Security Whitepaper extension.
+async function runCert16() {
+  console.log('\n=== Certificate management (OCPP 1.6 Security Extension) ===');
+  const frames = [];
+  let certs = [];
+  const charger = createCharger('1.6', {
+    endpoint: `ws://localhost:${PORT}`,
+    identity: 'CS-CERT16',
+    onLog: (e) => { if (e.kind === 'frame') frames.push(e.action); },
+    onCerts: (c) => { certs = c; },
+  });
+  await charger.connect();
+  await charger.boot();
+  server.triggerCertProvisioning('CS-CERT16'); // → ExtendedTriggerMessage(SignChargePointCertificate)
+  await wait(900);
+  const a = new Set(frames);
+  const has = (x) => a.has(x);
+  const tiers = certs.reduce((m, c) => ((m[c.tier] = (m[c.tier] || 0) + 1), m), {});
+  const ok =
+    has('ExtendedTriggerMessage') && has('SignCertificate') && has('InstallCertificate') &&
+    has('CertificateSigned') && has('GetInstalledCertificateIds') &&
+    tiers.root === 1 && tiers.intermediate === 2 && tiers.leaf === 1;
+  console.log(`  flow: ExtendedTriggerMessage=${has('ExtendedTriggerMessage')} SignCertificate=${has('SignCertificate')} InstallCertificate=${has('InstallCertificate')} CertificateSigned=${has('CertificateSigned')} GetInstalledCertificateIds=${has('GetInstalledCertificateIds')}`);
+  console.log(`  installed: ${certs.length} certs — tiers ${JSON.stringify(tiers)}`);
+  console.log(`  ${ok ? '✓ PASS' : '✗ FAIL'}`);
+  await charger.disconnect();
+  return ok;
+}
+
+// Local Authorization List (whitelist) + Plug & Charge auth (2.0.1).
+async function runLocalAuthAndPnC() {
+  console.log('\n=== Local auth list + Plug & Charge (2.0.1) ===');
+  const frames = [];
+  const charger = createCharger('2.0.1', {
+    endpoint: `ws://localhost:${PORT}`,
+    identity: 'CS-AUTH',
+    onLog: (e) => { if (e.kind === 'frame' && e.type === 2) frames.push(e.action); }, // outbound CALLs only
+  });
+  await charger.connect();
+  await charger.boot();
+  const authCount = () => frames.filter((f) => f === 'Authorize').length;
+
+  charger.addLocalAuth('RFID-LOCAL-1');
+  const before = authCount();
+  await charger.authorize('RFID-LOCAL-1');
+  const localOk = authCount() === before; // whitelisted → no Authorize sent to backend
+
+  await charger.authorize('RFID-UNKNOWN-9');
+  const centralOk = authCount() === before + 1; // unknown → Authorize sent
+
+  await charger.authorizePnC('DE-REY-C12345-3');
+  await wait(200);
+  const pncOk = frames.includes('Get15118EVCertificate') && authCount() === before + 2;
+
+  const ok = localOk && centralOk && pncOk;
+  console.log(`  whitelisted token authorized locally (no Authorize sent): ${localOk}`);
+  console.log(`  unknown token went to the backend (Authorize sent): ${centralOk}`);
+  console.log(`  Plug & Charge sent Get15118EVCertificate + Authorize(eMAID): ${pncOk}`);
+  console.log(`  ${ok ? '✓ PASS' : '✗ FAIL'}`);
+  await charger.disconnect();
+  return ok;
+}
+
 let allOk = true;
 try {
   for (const version of ['1.6', '2.0.1', '2.1']) {
@@ -124,6 +187,8 @@ try {
     allOk = allOk && ok;
   }
   allOk = (await runCertAndVars()) && allOk;
+  allOk = (await runCert16()) && allOk;
+  allOk = (await runLocalAuthAndPnC()) && allOk;
   console.log(`\n${allOk ? '✓ ALL CHECKS PASS' : '✗ SOME CHECKS FAILED'}`);
   await server.close();
   process.exit(allOk ? 0 : 1);
