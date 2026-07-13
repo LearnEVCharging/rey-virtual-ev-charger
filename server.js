@@ -28,11 +28,16 @@ const PORT = process.env.PORT || 8080;
 // mode). It is never exposed publicly — only this relay, on localhost, dials it.
 const MOCK_PORT = process.env.MOCK_PORT || 9000;
 const DEMO_ENDPOINT = `ws://127.0.0.1:${MOCK_PORT}`;
+let mockCsms = null;
 try {
-  await startMockCSMS(MOCK_PORT);
+  mockCsms = await startMockCSMS(MOCK_PORT);
 } catch (err) {
   console.warn(`[Rey] built-in demo CSMS not started (${err.message}) — demo mode may be unavailable`);
 }
+
+// Unique station id per demo session so the demo CSMS can address one station
+// (e.g. to trigger certificate provisioning) without colliding across visitors.
+let demoSeq = 0;
 
 const MIME = {
   '.html': 'text/html; charset=utf-8',
@@ -82,6 +87,7 @@ const wss = new WebSocketServer({ server: httpServer, path: '/ws' });
 
 wss.on('connection', (browser) => {
   let charger = null;
+  let isDemo = false;
 
   const send = (msg) => {
     if (browser.readyState === browser.OPEN) browser.send(JSON.stringify(msg));
@@ -106,9 +112,11 @@ wss.on('connection', (browser) => {
           return;
         }
         const version = OCPP_VERSIONS.includes(msg.version) ? msg.version : '2.0.1';
+        isDemo = !!msg.demo;
+        const identity = isDemo ? `Rey-DEMO-${++demoSeq}` : (msg.identity || `CS-${Math.floor(Math.random() * 1e6)}`);
         charger = createCharger(version, {
           endpoint,
-          identity: msg.identity || `CS-${Math.floor(Math.random() * 1e6)}`,
+          identity,
           password: msg.demo ? undefined : (msg.password || undefined),
           model: msg.model || 'Rey-1',
           onLog: (entry) => send({ type: 'log', entry }),
@@ -137,8 +145,17 @@ wss.on('connection', (browser) => {
         case 'status': await charger.setStatus(msg.status || 'Available'); break;
         case 'setVariable': charger.setLocalVariable(msg.key, msg.value); break;
         case 'requestCertificate':
-          if (typeof charger.requestCertificate === 'function') await charger.requestCertificate();
-          else send({ type: 'error', message: 'Certificate management is an OCPP 2.0.1 / 2.1 feature.' });
+          if (typeof charger.requestCertificate !== 'function') {
+            send({ type: 'error', message: 'Certificate management is an OCPP 2.0.1 / 2.1 feature.' });
+          } else if (isDemo && mockCsms?.triggerCertProvisioning) {
+            // Demo: let the CSMS drive it — it sends a TriggerMessage, the station
+            // responds with SignCertificate, then the CSMS installs the root and
+            // delivers the signed leaf chain. The full, realistic sequence.
+            if (!mockCsms.triggerCertProvisioning(charger.identity)) await charger.requestCertificate();
+          } else {
+            // Own CSMS: the station initiates SignCertificate; the real CSMS responds.
+            await charger.requestCertificate();
+          }
           break;
         case 'disconnect':
           await charger.disconnect();

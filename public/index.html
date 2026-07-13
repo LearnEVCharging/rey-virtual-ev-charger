@@ -98,7 +98,7 @@
 
     <details class="sub-panel" data-cert-panel open>
       <summary>Certificates <span class="sub-count" data-cert-count></span></summary>
-      <p class="hint small">The charge point generates a <strong>real</strong> RSA key + CSR; the demo CSMS signs it and returns the certificate over <code>CertificateSigned</code>. Watch the raw frames in the log.</p>
+      <p class="hint small">The demo CSMS sends a <code>TriggerMessage</code> → the charge point generates a <strong>real</strong> RSA key + CSR (<code>SignCertificate</code>) → the CSMS installs the root trust anchor (<code>InstallCertificate</code>) and returns the signed leaf chain (<code>CertificateSigned</code>). Watch every frame in the log.</p>
       <button class="btn btn-cert" data-act="requestCertificate" disabled>Request a certificate (SignCertificate)</button>
       <div class="cert-list" data-cert-list></div>
     </details>

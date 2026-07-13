@@ -91,21 +91,27 @@ async function runCertAndVars() {
   charger.setLocalVariable(key, '600');
   const edited = vars.find((v) => v.key === key)?.value === '600';
 
-  // Certificate: generate a real CSR, get it signed, install it.
-  await charger.requestCertificate();
-  await wait(600); // CSMS signs + delivers CertificateSigned + lists ids
+  // Certificate: CSMS-triggered provisioning — TriggerMessage → SignCertificate
+  // → InstallCertificate(root) → CertificateSigned(leaf chain) → GetInstalledCertificateIds.
+  server.triggerCertProvisioning('CS-CERT');
+  await wait(900);
 
   const actions = new Set(frames);
-  const gotSignReq = actions.has('SignCertificate');
-  const gotSigned = actions.has('CertificateSigned');
-  const gotList = actions.has('GetInstalledCertificateIds');
-  const installed = certs.length > 0;
-  const leaf = certs.find((c) => !/Root/.test(c.type));
+  const has = (a) => actions.has(a);
+  const tiers = certs.reduce((m, c) => ((m[c.tier] = (m[c.tier] || 0) + 1), m), {});
+  const leaf = certs.find((c) => c.tier === 'leaf');
+  const root = certs.find((c) => c.tier === 'root');
 
-  const ok = edited && gotSignReq && gotSigned && gotList && installed && !!leaf?.fingerprint;
+  const ok =
+    edited &&
+    has('TriggerMessage') && has('SignCertificate') && has('InstallCertificate') &&
+    has('CertificateSigned') && has('GetInstalledCertificateIds') &&
+    tiers.root === 1 && tiers.intermediate === 2 && tiers.leaf === 1 &&
+    !!leaf?.fingerprint && !!root?.fingerprint;
+
   console.log(`  device model edit took: ${edited}`);
-  console.log(`  SignCertificate sent: ${gotSignReq} | CertificateSigned received: ${gotSigned} | GetInstalledCertificateIds: ${gotList}`);
-  console.log(`  certificates installed: ${certs.length}${leaf ? ` (leaf ${leaf.subject}, issuer ${leaf.issuer})` : ''}`);
+  console.log(`  flow: TriggerMessage=${has('TriggerMessage')} SignCertificate=${has('SignCertificate')} InstallCertificate=${has('InstallCertificate')} CertificateSigned=${has('CertificateSigned')} GetInstalledCertificateIds=${has('GetInstalledCertificateIds')}`);
+  console.log(`  installed: ${certs.length} certs — tiers ${JSON.stringify(tiers)}${leaf ? ` (leaf ${leaf.subject} ← ${leaf.issuer})` : ''}`);
   console.log(`  ${ok ? '✓ PASS' : '✗ FAIL'}`);
   await charger.disconnect();
   return ok;

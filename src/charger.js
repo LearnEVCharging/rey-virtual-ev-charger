@@ -193,15 +193,16 @@ export class VirtualCharger {
     // ---- certificate management (security profiles 2/3, PnC rails) --------
     // The CSMS returns the signed certificate for a CSR the CP sent earlier.
     c.handle('CertificateSigned', ({ params }) => {
-      const n = this._installCertChain(params?.certificateChain || '', params?.certificateType || 'ChargingStationCertificate', true);
-      this._note(`Installed ${n} certificate(s) from CertificateSigned — the CP now holds a signed cert`);
+      this.certificates = this.certificates.filter((cert) => cert.tier !== 'leaf'); // a renewal replaces the old leaf
+      const n = this._installCertChain(params?.certificateChain || '', params?.certificateType || 'ChargingStationCertificate', 'signed');
+      this._note(`Installed the signed leaf chain (${n} cert(s): leaf + intermediate sub-CAs)`);
       this._pendingKeyPem = null;
       return { status: n > 0 ? 'Accepted' : 'Rejected' };
     });
     // The CSMS installs a root/CA certificate into the CP trust store.
     c.handle('InstallCertificate', ({ params }) => {
-      const n = this._installCertChain(params?.certificate || '', params?.certificateType || 'CSMSRootCertificate', false);
-      this._note(`Installed a ${params?.certificateType || 'root'} certificate`);
+      const n = this._installCertChain(params?.certificate || '', params?.certificateType || 'V2GRootCertificate', 'root');
+      this._note(`Installed the ${params?.certificateType || 'root'} trust anchor`);
       return { status: n > 0 ? 'Accepted' : 'Failed' };
     });
     // The CSMS asks which certificates the CP has installed.
@@ -380,6 +381,9 @@ export class VirtualCharger {
         return this.setStatus(this.state.connectorStatus).catch(() => {});
       case 'BootNotification':
         return this.boot('Triggered').catch(() => {});
+      case 'SignChargingStationCertificate':
+      case 'SignV2GCertificate':
+        return this.requestCertificate().catch(() => {});
       default:
         this._note(`No trigger handler for ${requested}`);
     }
@@ -445,28 +449,36 @@ export class VirtualCharger {
     return res;
   }
 
-  // Parse a PEM chain and add each certificate to the store.
-  _installCertChain(pem, type, leafFirst) {
+  // Parse a PEM chain and add each certificate to the store, tagged by tier.
+  // kind: 'root' (a trust anchor from InstallCertificate) or 'signed' (a leaf
+  // chain from CertificateSigned — leaf first, then intermediate sub-CAs).
+  _installCertChain(pem, type, kind) {
     const parts = splitPemChain(pem);
+    let parsed = 0;
     parts.forEach((certPem, i) => {
-      const t = leafFirst && i === 0 ? type : 'CSMSRootCertificate';
-      const issuerPem = parts[i + 1] || certPem; // leaf's issuer is the next (CA); root is self-signed
       let summary;
       let hashData;
       try {
         summary = summarizeCert(certPem);
-        hashData = certHashData(certPem, issuerPem);
+        hashData = certHashData(certPem, parts[i + 1] || certPem); // issuer is the next cert up the chain
       } catch {
         return; // skip anything that isn't a parseable certificate
       }
-      this.certificates.push({ type: t, certPem, summary, hashData });
+      parsed++;
+      if (this.certificates.some((c) => c.summary.fingerprint === summary.fingerprint)) return; // idempotent install
+      let tier;
+      let t;
+      if (kind === 'root') { tier = 'root'; t = type || 'V2GRootCertificate'; }
+      else if (i === 0) { tier = 'leaf'; t = type || 'ChargingStationCertificate'; }
+      else { tier = 'intermediate'; t = 'SubCA'; }
+      this.certificates.push({ type: t, tier, certPem, summary, hashData });
     });
     this._pushCerts();
-    return this.certificates.length ? parts.length : 0;
+    return parsed;
   }
 
   _certList() {
-    return this.certificates.map((c) => ({ type: c.type, pem: c.certPem, ...c.summary }));
+    return this.certificates.map((c) => ({ type: c.type, tier: c.tier, pem: c.certPem, ...c.summary }));
   }
 
   _pushCerts() {

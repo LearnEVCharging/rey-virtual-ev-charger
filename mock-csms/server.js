@@ -14,7 +14,7 @@
  * TransactionEvent lifecycle and an idToken object.
  */
 import { RPCServer, createRPCError } from 'ocpp-rpc';
-import { createCA, signCsr } from '../src/certs.js';
+import { createPKI, signLeaf } from '../src/certs.js';
 
 export async function startMockCSMS(port = 9000) {
   const server = new RPCServer({
@@ -22,8 +22,13 @@ export async function startMockCSMS(port = 9000) {
     strictMode: false,
   });
 
-  // A throwaway root CA so the demo CSMS can sign charge-point CSRs for real.
-  const ca = createCA();
+  // A throwaway 3-tier PKI (Root → Sub-CA 1 → Sub-CA 2) so the demo CSMS can
+  // sign charge-point CSRs into a realistic chain, for real.
+  const pkiChain = createPKI();
+
+  // Track connected stations by identity so the CSMS can push a message to a
+  // specific one (used to kick off certificate provisioning in demo mode).
+  const clients = new Map();
 
   // Accept every station. A real CSMS would check identity + password here.
   server.auth((accept, reject, handshake) => {
@@ -35,6 +40,7 @@ export async function startMockCSMS(port = 9000) {
 
   server.on('client', (client) => {
     const proto = client.protocol || 'ocpp?';
+    clients.set(client.identity, client);
     console.log(`[mock-csms] ${client.identity} connected (${proto})`);
 
     // ---- shared across all versions ------------------------------------
@@ -70,20 +76,24 @@ export async function startMockCSMS(port = 9000) {
     client.handle('NotifyEvent', () => ({}));
 
     // ---- certificate management (OCPP 2.0.1 / 2.1) ----------------------
-    // The station sends a CSR; we sign it into a real cert and hand it back
-    // via CertificateSigned, then ask what it now has installed.
+    // The station sends a CSR; we sign it under Sub-CA 2, then provision it the
+    // way a real CSMS does: install the ROOT trust anchor first, then deliver
+    // the signed leaf chain (leaf + Sub-CA 2 + Sub-CA 1), then read back what's
+    // installed. (Provisioning is usually kicked off by the TriggerMessage the
+    // relay sends in demo mode — see triggerCertProvisioning below.)
     client.handle('SignCertificate', ({ params }) => {
       console.log(`[mock-csms] SignCertificate (CSR) from ${client.identity}`);
-      let chainPem;
+      let signed;
       try {
-        chainPem = signCsr(params.csr, ca.caCertPem, ca.caKeyPem);
+        signed = signLeaf(params.csr, pkiChain);
       } catch (err) {
         console.log(`[mock-csms] CSR rejected: ${err.message}`);
         return { status: 'Rejected' };
       }
       setTimeout(async () => {
         try {
-          await client.call('CertificateSigned', { certificateChain: chainPem, certificateType: 'ChargingStationCertificate' });
+          await client.call('InstallCertificate', { certificateType: 'V2GRootCertificate', certificate: pkiChain.rootPem });
+          await client.call('CertificateSigned', { certificateChain: signed.chainPem, certificateType: 'ChargingStationCertificate' });
           const ids = await client.call('GetInstalledCertificateIds', {});
           console.log(`[mock-csms] ${client.identity} now reports ${ids?.certificateHashDataChain?.length || 0} installed cert(s)`);
         } catch (err) {
@@ -98,8 +108,18 @@ export async function startMockCSMS(port = 9000) {
       throw createRPCError('NotImplemented', `${method} is not implemented by the mock CSMS`);
     });
 
-    client.on('close', () => console.log(`[mock-csms] ${client.identity} disconnected`));
+    client.on('close', () => { clients.delete(client.identity); console.log(`[mock-csms] ${client.identity} disconnected`); });
   });
+
+  // The relay calls this (demo mode) to make the CSMS kick off certificate
+  // provisioning on a station: it sends a TriggerMessage asking the station to
+  // sign a new charge-point certificate, which starts the SignCertificate flow.
+  server.triggerCertProvisioning = (identity) => {
+    const client = clients.get(identity);
+    if (!client) return false;
+    client.call('TriggerMessage', { requestedMessage: 'SignChargingStationCertificate' }).catch(() => {});
+    return true;
+  };
 
   await server.listen(port);
   console.log(`[mock-csms] OCPP 1.6 / 2.0.1 / 2.1 CSMS listening on ws://localhost:${port}`);

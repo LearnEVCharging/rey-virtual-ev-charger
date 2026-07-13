@@ -51,58 +51,75 @@ export function generateKeyAndCsr({ commonName = 'Rey-001', organization = 'Lear
   };
 }
 
-/**
- * CSMS side: create a self-signed root CA (once, at startup) that will sign
- * charge-point CSRs.
- */
-export function createCA({ commonName = 'Rey Demo Root CA', organization = 'Learn EV Charging' } = {}) {
-  const keys = pki.rsa.generateKeyPair(2048);
-  const cert = pki.createCertificate();
-  cert.publicKey = keys.publicKey;
-  cert.serialNumber = randomSerial();
-  cert.validity.notBefore = new Date();
-  cert.validity.notAfter = new Date();
-  cert.validity.notAfter.setFullYear(cert.validity.notBefore.getFullYear() + 10);
-  const attrs = [
+function nameAttrs(commonName, organization = 'Learn EV Charging') {
+  return [
     { name: 'commonName', value: commonName },
     { name: 'organizationName', value: organization },
   ];
-  cert.setSubject(attrs);
-  cert.setIssuer(attrs);
-  cert.setExtensions([
-    { name: 'basicConstraints', cA: true },
-    { name: 'keyUsage', keyCertSign: true, cRLSign: true },
-  ]);
-  cert.sign(keys.privateKey, md.sha256.create());
-  return { caCertPem: pki.certificateToPem(cert), caKeyPem: pki.privateKeyToPem(keys.privateKey) };
 }
 
-/**
- * CSMS side: sign a charge-point CSR into a real leaf certificate under the CA.
- * Returns the certificate chain PEM (leaf + CA), like CertificateSigned carries.
- */
-export function signCsr(csrPem, caCertPem, caKeyPem, { days = 365 } = {}) {
-  const csr = pki.certificationRequestFromPem(csrPem);
-  if (!csr.verify()) throw new Error('CSR signature is invalid');
-
-  const caCert = pki.certificateFromPem(caCertPem);
-  const caKey = pki.privateKeyFromPem(caKeyPem);
-
+// Issue an X.509 cert. issuerCert/issuerKey null → self-signed (the root).
+function issueCert({ subjectAttrs, publicKey, issuerCert, issuerKey, isCA, pathLen, days }) {
   const cert = pki.createCertificate();
-  cert.publicKey = csr.publicKey;
+  cert.publicKey = publicKey;
   cert.serialNumber = randomSerial();
   cert.validity.notBefore = new Date();
   cert.validity.notAfter = new Date();
   cert.validity.notAfter.setDate(cert.validity.notBefore.getDate() + days);
-  cert.setSubject(csr.subject.attributes);
-  cert.setIssuer(caCert.subject.attributes);
-  cert.setExtensions([
-    { name: 'basicConstraints', cA: false },
-    { name: 'keyUsage', digitalSignature: true, keyEncipherment: true },
-    { name: 'extKeyUsage', clientAuth: true },
-  ]);
-  cert.sign(caKey, md.sha256.create());
-  return pki.certificateToPem(cert) + caCertPem;
+  cert.setSubject(subjectAttrs);
+  cert.setIssuer(issuerCert ? issuerCert.subject.attributes : subjectAttrs);
+  const ext = isCA
+    ? [
+        { name: 'basicConstraints', cA: true, ...(pathLen != null ? { pathLenConstraint: pathLen } : {}) },
+        { name: 'keyUsage', keyCertSign: true, cRLSign: true },
+      ]
+    : [
+        { name: 'basicConstraints', cA: false },
+        { name: 'keyUsage', digitalSignature: true, keyEncipherment: true },
+        { name: 'extKeyUsage', clientAuth: true },
+      ];
+  cert.setExtensions(ext);
+  cert.sign(issuerKey, md.sha256.create());
+  return cert;
+}
+
+/**
+ * CSMS side: stand up a realistic PKI once at startup — a self-signed Root CA
+ * that signs Sub-CA 1, which signs Sub-CA 2, which signs charge-point leaf
+ * certs. This mirrors how OCPP 2.0.1 / ISO 15118 PKIs are actually structured:
+ * a protected offline root, intermediate sub-CAs, and short-lived leaf certs.
+ */
+export function createPKI() {
+  const rootKeys = pki.rsa.generateKeyPair(2048);
+  const root = issueCert({ subjectAttrs: nameAttrs('Rey Demo Root CA'), publicKey: rootKeys.publicKey, issuerCert: null, issuerKey: rootKeys.privateKey, isCA: true, pathLen: 2, days: 3650 });
+
+  const sub1Keys = pki.rsa.generateKeyPair(2048);
+  const sub1 = issueCert({ subjectAttrs: nameAttrs('Rey Demo Sub-CA 1'), publicKey: sub1Keys.publicKey, issuerCert: root, issuerKey: rootKeys.privateKey, isCA: true, pathLen: 1, days: 1825 });
+
+  const sub2Keys = pki.rsa.generateKeyPair(2048);
+  const sub2 = issueCert({ subjectAttrs: nameAttrs('Rey Demo Sub-CA 2'), publicKey: sub2Keys.publicKey, issuerCert: sub1, issuerKey: sub1Keys.privateKey, isCA: true, pathLen: 0, days: 1825 });
+
+  return {
+    rootPem: pki.certificateToPem(root),
+    subCa1Pem: pki.certificateToPem(sub1),
+    subCa2Pem: pki.certificateToPem(sub2),
+    _sub2Cert: sub2,
+    _sub2Key: sub2Keys.privateKey,
+  };
+}
+
+/**
+ * CSMS side: sign a charge-point CSR into a leaf cert under Sub-CA 2, and return
+ * the chain the way CertificateSigned carries it: leaf + intermediates
+ * (Sub-CA 2, Sub-CA 1), WITHOUT the root — the charge point already trusts the
+ * root because the CSMS installed it separately via InstallCertificate.
+ */
+export function signLeaf(csrPem, pkiObj, { days = 365 } = {}) {
+  const csr = pki.certificationRequestFromPem(csrPem);
+  if (!csr.verify()) throw new Error('CSR signature is invalid');
+  const leaf = issueCert({ subjectAttrs: csr.subject.attributes, publicKey: csr.publicKey, issuerCert: pkiObj._sub2Cert, issuerKey: pkiObj._sub2Key, isCA: false, days });
+  const leafPem = pki.certificateToPem(leaf);
+  return { leafPem, chainPem: leafPem + pkiObj.subCa2Pem + pkiObj.subCa1Pem };
 }
 
 // Split a PEM bundle into individual certificate PEM blocks (leaf first).

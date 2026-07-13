@@ -102,6 +102,10 @@
     });
   }
 
+  // Order the store as the chain reads: root (trust anchor) → intermediates → leaf.
+  const TIER_RANK = { root: 0, intermediate: 1, leaf: 2 };
+  const TIER_LABEL = { root: 'Root CA · trust anchor', intermediate: 'Intermediate CA', leaf: 'Charging station cert' };
+
   function renderCerts(certs) {
     const list = $('[data-cert-list]');
     const count = $('[data-cert-count]');
@@ -111,13 +115,16 @@
       list.innerHTML = '<p class="cert-empty">No certificates installed yet. Click “Request a certificate”.</p>';
       return;
     }
+    const ordered = certs.slice().sort(
+      (a, b) => (TIER_RANK[a.tier] ?? 9) - (TIER_RANK[b.tier] ?? 9) || (a.subject || '').localeCompare(b.subject || '')
+    );
     list.innerHTML = '';
-    certs.forEach((c) => {
-      const isRoot = /Root/.test(c.type) || c.selfSigned;
+    ordered.forEach((c) => {
+      const tier = c.tier || (/Root/.test(c.type) || c.selfSigned ? 'root' : 'leaf');
       const card = document.createElement('div');
-      card.className = 'cert-card' + (isRoot ? ' root' : '');
+      card.className = `cert-card tier-${tier}`;
       card.innerHTML =
-        `<span class="cert-type">${escapeHtml(c.type || 'certificate')}</span>` +
+        `<span class="cert-type">${escapeHtml(TIER_LABEL[tier] || c.type || 'certificate')}</span>` +
         `<div class="cert-cn">${escapeHtml(c.subject || '')}</div>` +
         `<div class="cert-meta">issuer: ${escapeHtml(c.issuer || '')} · serial ${escapeHtml((c.serialNumber || '').slice(0, 16))}</div>` +
         `<div class="cert-meta">valid ${escapeHtml((c.notBefore || '').slice(0, 10))} → ${escapeHtml((c.notAfter || '').slice(0, 10))}</div>` +

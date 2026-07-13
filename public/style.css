@@ -82,12 +82,14 @@ code { font-family: "SF Mono", Menlo, Consolas, monospace; background: rgba(0,0,
 .btn-cert { width: 100%; font-size: 13px; }
 .cert-list { display: flex; flex-direction: column; gap: 8px; margin-top: 10px; }
 .cert-card { border: 1px solid var(--line); border-left: 3px solid var(--green); border-radius: 8px; padding: 8px 10px; background: var(--surface); font-size: 12px; }
-.cert-card.root { border-left-color: var(--blue); }
+.cert-card.tier-root { border-left-color: var(--blue); }
+.cert-card.tier-intermediate { border-left-color: var(--amber); }
 .cert-card .cert-cn { font-weight: 700; color: var(--navy); }
 .cert-card .cert-meta { color: var(--muted); margin-top: 2px; }
 .cert-card .cert-fp { font-family: "SF Mono", Menlo, Consolas, monospace; font-size: 10px; color: var(--muted); word-break: break-all; margin-top: 4px; }
 .cert-card .cert-type { display: inline-block; font-size: 10px; font-weight: 700; color: var(--green); text-transform: uppercase; letter-spacing: 0.04em; }
-.cert-card.root .cert-type { color: var(--blue); }
+.cert-card.tier-root .cert-type { color: var(--blue); }
+.cert-card.tier-intermediate .cert-type { color: var(--amber); }
 .cert-empty { color: var(--muted); font-size: 12px; }
 .mode-btn { border: none; background: transparent; color: var(--muted); font-size: 13px; font-weight: 600; padding: 7px 14px; border-radius: 7px; cursor: pointer; }
 .mode-btn.active { background: var(--surface); color: var(--navy); box-shadow: 0 1px 2px rgba(0,0,0,0.1); }
@@ -120,6 +122,7 @@ code { font-family: "SF Mono", Menlo, Consolas, monospace; background: rgba(0,0,
 .btn-ghost { border: none; background: transparent; color: var(--muted); }
 
 .grid { display: grid; grid-template-columns: 320px 1fr; gap: 20px; padding: 20px 24px; align-items: start; }
+.grid > * { min-width: 0; } /* let the log column shrink instead of forcing page-wide horizontal scroll */
 @media (max-width: 820px) { .grid { grid-template-columns: 1fr; } }
 
 .panel { background: var(--surface); border: 1px solid var(--line); border-radius: var(--radius); padding: 18px; }
@@ -158,7 +161,7 @@ code { font-family: "SF Mono", Menlo, Consolas, monospace; background: rgba(0,0,
 /* Open by default and fully visible; only very tall frames cap + scroll within. */
 .entry.open .entry-body { display: block; max-height: 480px; }
 .entry-toggle { margin-left: 8px; font-size: 11px; color: var(--muted); font-weight: 600; }
-.entry-body pre { margin: 0; font-family: "SF Mono", Menlo, monospace; font-size: 12px; line-height: 1.5; white-space: pre; }
+.entry-body pre { margin: 0; font-family: "SF Mono", Menlo, monospace; font-size: 12px; line-height: 1.5; white-space: pre-wrap; overflow-wrap: anywhere; }
 .note-text { padding: 8px 12px; font-size: 13px; color: var(--muted); }
 
 .t-key { color: #90cdf4; }
