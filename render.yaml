@@ -3,7 +3,7 @@
 # (Or: New → Web Service → this repo → Build `npm install`, Start `npm start`.)
 services:
   - type: web
-    name: sal-virtual-charger
+    name: rey-virtual-charger
     runtime: node
     plan: free
     buildCommand: npm install
