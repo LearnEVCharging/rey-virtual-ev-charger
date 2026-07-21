@@ -32,11 +32,18 @@ export class VirtualCharger16 {
     maxPowerKw = 150,
     maxVoltageV = 500,
     maxCurrentA = 300,
+    countryCode = 'DE',
+    operatorId = 'REY',
+    evseId = 'E000001',
+    chargingStationId = 'REY-STATION-01',
+    tariff = '',
+    defaultEmaid = 'DE-REY-C12345-3',
     onLog = () => {},
     onState = () => {},
     onVars = () => {},
     onCerts = () => {},
     onLocalList = () => {},
+    onIdentity = () => {},
   }) {
     this.endpoint = endpoint;
     this.identity = identity;
@@ -49,6 +56,12 @@ export class VirtualCharger16 {
     this.maxPowerKw = maxPowerKw;
     this.maxVoltageV = maxVoltageV;
     this.maxCurrentA = maxCurrentA;
+    this.countryCode = countryCode;
+    this.operatorId = operatorId;
+    this.evseId = evseId;
+    this.chargingStationId = chargingStationId;
+    this.tariff = tariff;
+    this.defaultEmaid = defaultEmaid;
     this.protocol = 'ocpp1.6';
     this.authMode = 'rfid'; // rfid | app (Plug & Charge is OCPP 2.0.1+)
     this.onLog = onLog;
@@ -56,6 +69,7 @@ export class VirtualCharger16 {
     this.onVars = onVars;
     this.onCerts = onCerts;
     this.onLocalList = onLocalList;
+    this.onIdentity = onIdentity;
 
     this.state = {
       connection: 'disconnected',
@@ -70,12 +84,31 @@ export class VirtualCharger16 {
     };
 
     // 1.6 configuration is a flat key/value map (GetConfiguration/ChangeConfiguration).
+    // The identity rows mirror the station nameplate (see _identityVarMap).
     this.config = {
       HeartbeatInterval: '300',
       MeterValueSampleInterval: '60',
       ConnectorPhaseRotation: 'RST',
       AuthorizeRemoteTxRequests: 'true',
       NumberOfConnectors: String(connectorCount),
+      ConnectorType: this.connectorType,
+      RatedPowerKW: String(this.maxPowerKw),
+      ChargingStationId: this.chargingStationId,
+      CountryCode: this.countryCode,
+      EVSEOperatorID: this.operatorId,
+      EVSEID: this.evseId,
+      DefaultTariff: this.tariff,
+    };
+
+    // Config key -> nameplate field; editing one updates the nameplate.
+    this._identityVarMap = {
+      ConnectorType: 'connectorType',
+      RatedPowerKW: 'maxPowerKw',
+      ChargingStationId: 'chargingStationId',
+      CountryCode: 'countryCode',
+      EVSEOperatorID: 'operatorId',
+      EVSEID: 'evseId',
+      DefaultTariff: 'tariff',
     };
 
     // Certificate management (OCPP 1.6 Security Whitepaper extension).
@@ -156,7 +189,11 @@ export class VirtualCharger16 {
       return { status: 'Accepted' };
     });
     c.handle('ChangeConfiguration', ({ params }) => {
-      if (params?.key) { this.config[params.key] = params.value; this._pushVars(); }
+      if (params?.key) {
+        this.config[params.key] = params.value;
+        this._pushVars();
+        if (this._syncIdentityFromVar(params.key, params.value)) this._pushIdentity();
+      }
       return { status: 'Accepted' };
     });
     c.handle('GetConfiguration', ({ params }) => {
@@ -239,6 +276,11 @@ export class VirtualCharger16 {
   }
 
   // ---- identity / nameplate (what a backend needs to register the station) --
+  // ISO 15118 EVSEID in eMI3 form: <Country>*<Operator>*<EVSE id>, e.g. DE*REY*E000001.
+  evseIdFull() {
+    return `${this.countryCode}*${this.operatorId}*${this.evseId}`;
+  }
+
   identityInfo() {
     return {
       identity: this.identity,
@@ -252,7 +294,27 @@ export class VirtualCharger16 {
       maxPowerKw: this.maxPowerKw,
       maxVoltageV: this.maxVoltageV,
       maxCurrentA: this.maxCurrentA,
+      countryCode: this.countryCode,
+      operatorId: this.operatorId,
+      evseId: this.evseId,
+      evseIdFull: this.evseIdFull(),
+      chargingStationId: this.chargingStationId,
+      tariff: this.tariff,
+      defaultEmaid: this.defaultEmaid,
     };
+  }
+
+  // Keep the nameplate in sync when a mirrored config key is edited
+  // (locally in the Configuration panel, or by the CSMS via ChangeConfiguration).
+  _syncIdentityFromVar(key, value) {
+    const field = this._identityVarMap?.[key];
+    if (!field) return false;
+    this[field] = field === 'maxPowerKw' ? (Number(value) || this.maxPowerKw) : value;
+    return true;
+  }
+
+  _pushIdentity() {
+    this.onIdentity(this.identityInfo());
   }
 
   // ---- boot + heartbeat ---------------------------------------------------
@@ -394,13 +456,14 @@ export class VirtualCharger16 {
     if (!(key in this.config)) return;
     this.config[key] = value;
     this._pushVars();
+    if (this._syncIdentityFromVar(key, value)) this._pushIdentity();
     this._note(`Set ${key} = ${value} locally`);
   }
 
   // ---- certificate management (1.6 Security Whitepaper extension) ---------
   async requestCertificate() {
     this._note('Generating an RSA-2048 key pair and a PKCS#10 CSR on the charge point…');
-    const { privateKeyPem, csrPem } = generateKeyAndCsr({ commonName: this.identity || 'Rey-CP', organization: this.vendor });
+    const { privateKeyPem, csrPem } = generateKeyAndCsr({ commonName: this.identity || 'Rey-CP', organization: this.vendor, country: this.countryCode });
     this._pendingKeyPem = privateKeyPem;
     const res = await this.client.call('SignCertificate', { csr: csrPem });
     this._note(res?.status === 'Accepted' ? 'CSMS accepted the CSR — awaiting CertificateSigned' : `CSMS ${res?.status || 'did not accept'} the CSR`);

@@ -98,7 +98,8 @@
     if (msg.type === 'vars') return renderVars(msg.vars);
     if (msg.type === 'certs') return renderCerts(msg.certs);
     if (msg.type === 'localList') return renderLocalList(msg.list);
-    if (msg.type === 'connected') { connected = true; sessionDemo = !!msg.demo; ctaShown = false; setConn('connected'); setControls(); renderIdentity(msg.station, msg.version); return; }
+    if (msg.type === 'connected') { connected = true; sessionDemo = !!msg.demo; ctaShown = false; setConn('connected'); setControls(); renderIdentity(msg.station, msg.version, true); return; }
+    if (msg.type === 'identity') { renderIdentity(msg.station, version, false); return; }
     if (msg.type === 'disconnected') { connected = false; setConn('disconnected'); setControls(); clearPanels(); return; }
     if (msg.type === 'error') return renderNote('⚠ ' + msg.message, true);
   }
@@ -232,6 +233,12 @@
       maxPowerKw: num('[data-p-power]', 150),
       maxVoltageV: num('[data-p-voltage]', 500),
       maxCurrentA: num('[data-p-current]', 300),
+      countryCode: str('[data-p-country]', 'DE'),
+      operatorId: str('[data-p-operator]', 'REY'),
+      evseId: str('[data-p-evseid]', 'E000001'),
+      chargingStationId: str('[data-p-stationid]', 'REY-STATION-01'),
+      tariff: ($('[data-p-tariff]')?.value?.trim()) || '',
+      defaultEmaid: str('[data-p-emaid]', 'DE-REY-C12345-3'),
     };
   }
 
@@ -294,20 +301,25 @@
     $('[data-power]').textContent = (s.powerW || 0).toLocaleString() + ' W';
   }
 
-  // Station nameplate: the CBID + identity/config a backend needs to register it.
-  function renderIdentity(station, ver) {
+  // Station nameplate: the CBID + ISO 15118 identity a backend needs to register it.
+  function renderIdentity(station, ver, isInitial) {
     const box = $('[data-identity]');
     if (!station) { if (box) box.hidden = true; return; }
     const setv = (sel, val) => { const el = $(sel); if (el) el.textContent = val; };
     const is16 = ver === '1.6' || station.protocol === 'ocpp1.6';
     setv('[data-id-cbid]', station.identity || '—');
+    setv('[data-id-evseid]', station.evseIdFull || '—');
+    setv('[data-id-stationid]', station.chargingStationId || '—');
     setv('[data-id-ocpp]', 'OCPP ' + (ver || (station.protocol || '').replace('ocpp', '')));
     setv('[data-id-vendormodel]', `${station.vendor || ''} · ${station.model || ''}`);
     setv('[data-id-serial]', station.serialNumber || '—');
     setv('[data-id-firmware]', station.firmwareVersion || '—');
     setv('[data-id-connector]', `${station.connectorType || '—'} × ${station.connectorCount ?? 1}`);
     setv('[data-id-power]', `${station.maxPowerKw} kW · ${station.maxVoltageV} V · ${station.maxCurrentA} A`);
+    setv('[data-id-tariff]', station.tariff || '—');
     if (box) box.hidden = false;
+    // Pre-fill the Plug & Charge auth token from the commissioned eMAID (once).
+    if (isInitial && station.defaultEmaid) { const em = $('[data-emaid]'); if (em) em.value = station.defaultEmaid; }
     // 1.6 exposes flat "Configuration keys"; 2.0.1/2.1 a "Device model".
     const dmLabel = $('[data-dm-label]');
     if (dmLabel) dmLabel.textContent = is16 ? 'Configuration keys' : 'Device model';

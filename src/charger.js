@@ -32,11 +32,18 @@ export class VirtualCharger {
     maxPowerKw = 150,
     maxVoltageV = 500,
     maxCurrentA = 300,
+    countryCode = 'DE',
+    operatorId = 'REY',
+    evseId = 'E000001',
+    chargingStationId = 'REY-STATION-01',
+    tariff = '',
+    defaultEmaid = 'DE-REY-C12345-3',
     onLog = () => {},
     onState = () => {},
     onVars = () => {},
     onCerts = () => {},
     onLocalList = () => {},
+    onIdentity = () => {},
   }) {
     this.endpoint = endpoint;
     this.identity = identity;
@@ -50,12 +57,19 @@ export class VirtualCharger {
     this.maxPowerKw = maxPowerKw;
     this.maxVoltageV = maxVoltageV;
     this.maxCurrentA = maxCurrentA;
+    this.countryCode = countryCode;
+    this.operatorId = operatorId;
+    this.evseId = evseId;
+    this.chargingStationId = chargingStationId;
+    this.tariff = tariff;
+    this.defaultEmaid = defaultEmaid;
     this.authMode = 'rfid'; // rfid | app | pnc (Plug & Charge)
     this.onLog = onLog;
     this.onState = onState;
     this.onVars = onVars;
     this.onCerts = onCerts;
     this.onLocalList = onLocalList;
+    this.onIdentity = onIdentity;
 
     this.state = {
       connection: 'disconnected',
@@ -70,11 +84,31 @@ export class VirtualCharger {
     };
 
     // A tiny slice of a Device Model so Get/SetVariables do something real.
+    // The identity rows mirror the station nameplate (see _identityVarMap).
     this.variables = {
       'SampledDataCtrlr/TxUpdatedInterval': '30',
       'OCPPCommCtrlr/HeartbeatInterval': '300',
       'AuthCtrlr/AuthorizeRemoteStart': 'true',
       'DeviceDataCtrlr/BytesPerMessageGetReport': '0',
+      'Connector/ConnectorType': this.connectorType,
+      'ChargingStation/RatedPowerKW': String(this.maxPowerKw),
+      'ChargingStation/ChargingStationId': this.chargingStationId,
+      'ISO15118Ctrlr/CountryCode': this.countryCode,
+      'ISO15118Ctrlr/EVSEOperatorID': this.operatorId,
+      'ISO15118Ctrlr/EVSEID': this.evseId,
+      'TariffCostCtrlr/DefaultTariff': this.tariff,
+    };
+
+    // Device-model variable key -> nameplate field. Editing one of these (in
+    // the Configuration panel or via SetVariables) updates the nameplate.
+    this._identityVarMap = {
+      'Connector/ConnectorType': 'connectorType',
+      'ChargingStation/RatedPowerKW': 'maxPowerKw',
+      'ChargingStation/ChargingStationId': 'chargingStationId',
+      'ISO15118Ctrlr/CountryCode': 'countryCode',
+      'ISO15118Ctrlr/EVSEOperatorID': 'operatorId',
+      'ISO15118Ctrlr/EVSEID': 'evseId',
+      'TariffCostCtrlr/DefaultTariff': 'tariff',
     };
 
     // Installed certificates (real X.509, from CertificateSigned / InstallCertificate).
@@ -198,12 +232,15 @@ export class VirtualCharger {
       return { getVariableResult: results };
     });
     c.handle('SetVariables', ({ params }) => {
+      let identityChanged = false;
       const results = (params?.setVariableData || []).map((d) => {
         const key = `${d.component?.name}/${d.variable?.name}`;
         this.variables[key] = d.attributeValue;
+        if (this._syncIdentityFromVar(key, d.attributeValue)) identityChanged = true;
         return { attributeStatus: 'Accepted', component: d.component, variable: d.variable };
       });
       this._pushVars();
+      if (identityChanged) this._pushIdentity();
       return { setVariableResult: results };
     });
     c.handle('GetBaseReport', ({ params }) => {
@@ -279,6 +316,11 @@ export class VirtualCharger {
   }
 
   // ---- identity / nameplate (what a backend needs to register the station) --
+  // ISO 15118 EVSEID in eMI3 form: <Country>*<Operator>*<EVSE id>, e.g. DE*REY*E000001.
+  evseIdFull() {
+    return `${this.countryCode}*${this.operatorId}*${this.evseId}`;
+  }
+
   identityInfo() {
     return {
       identity: this.identity,
@@ -292,7 +334,27 @@ export class VirtualCharger {
       maxPowerKw: this.maxPowerKw,
       maxVoltageV: this.maxVoltageV,
       maxCurrentA: this.maxCurrentA,
+      countryCode: this.countryCode,
+      operatorId: this.operatorId,
+      evseId: this.evseId,
+      evseIdFull: this.evseIdFull(),
+      chargingStationId: this.chargingStationId,
+      tariff: this.tariff,
+      defaultEmaid: this.defaultEmaid,
     };
+  }
+
+  // Keep the nameplate in sync when a mirrored device-model variable is edited
+  // (locally in the Configuration panel, or by the CSMS via SetVariables).
+  _syncIdentityFromVar(key, value) {
+    const field = this._identityVarMap?.[key];
+    if (!field) return false;
+    this[field] = field === 'maxPowerKw' ? (Number(value) || this.maxPowerKw) : value;
+    return true;
+  }
+
+  _pushIdentity() {
+    this.onIdentity(this.identityInfo());
   }
 
   // ---- boot + heartbeat ---------------------------------------------------
@@ -357,6 +419,7 @@ export class VirtualCharger {
   // everything the charge point does over OCPP (Get15118EVCertificate, Authorize
   // with an eMAID idToken) is real.
   async authorizePnC(eMAID = 'DE-REY-C12345-3') {
+    this._note(`SECC presented EVSEID ${this.evseIdFull()} to the EV (ISO 15118 SessionSetup)`);
     this._note(`EV presented an ISO 15118 contract certificate (eMAID ${eMAID}) — Plug & Charge`);
     this._setState({ idToken: eMAID });
     await this.client
@@ -504,6 +567,7 @@ export class VirtualCharger {
     if (!(key in this.variables)) return;
     this.variables[key] = value;
     this._pushVars();
+    if (this._syncIdentityFromVar(key, value)) this._pushIdentity();
     this._note(`Set ${key} = ${value} locally`);
   }
 
@@ -514,6 +578,7 @@ export class VirtualCharger {
     const { privateKeyPem, csrPem } = generateKeyAndCsr({
       commonName: this.identity || 'Rey-001',
       organization: this.vendor,
+      country: this.countryCode,
     });
     this._pendingKeyPem = privateKeyPem; // stays on the CP; only the CSR is sent
     const res = await this.client.call('SignCertificate', {

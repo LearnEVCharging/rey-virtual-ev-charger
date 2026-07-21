@@ -96,6 +96,12 @@ function sanitizeProfile(msg) {
   const maxPowerKw = num(msg.maxPowerKw, 1, 1000); if (maxPowerKw != null) out.maxPowerKw = maxPowerKw;
   const maxVoltageV = num(msg.maxVoltageV, 1, 2000); if (maxVoltageV != null) out.maxVoltageV = maxVoltageV;
   const maxCurrentA = num(msg.maxCurrentA, 1, 1000); if (maxCurrentA != null) out.maxCurrentA = maxCurrentA;
+  const countryCode = str(msg.countryCode, 4); if (countryCode) out.countryCode = countryCode.toUpperCase();
+  const operatorId = str(msg.operatorId, 8); if (operatorId) out.operatorId = operatorId;
+  const evseId = str(msg.evseId, 40); if (evseId) out.evseId = evseId;
+  const chargingStationId = str(msg.chargingStationId, 48); if (chargingStationId) out.chargingStationId = chargingStationId;
+  const tariff = str(msg.tariff, 60); if (tariff) out.tariff = tariff;
+  const defaultEmaid = str(msg.defaultEmaid, 40); if (defaultEmaid) out.defaultEmaid = defaultEmaid;
   return out;
 }
 
@@ -142,6 +148,7 @@ wss.on('connection', (browser) => {
           onVars: (vars) => send({ type: 'vars', vars }),
           onCerts: (certs) => send({ type: 'certs', certs }),
           onLocalList: (list) => send({ type: 'localList', list }),
+          onIdentity: (station) => send({ type: 'identity', station }),
         });
         await charger.connect();
         send({ type: 'connected', identity: charger.identity, demo: !!msg.demo, version, station: charger.identityInfo?.() });

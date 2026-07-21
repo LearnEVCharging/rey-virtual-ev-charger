@@ -64,6 +64,12 @@
         <div class="field"><label for="p-power">Rated power (kW)</label><input id="p-power" data-p-power type="number" min="1" value="150" /></div>
         <div class="field"><label for="p-voltage">Max voltage (V)</label><input id="p-voltage" data-p-voltage type="number" min="1" value="500" /></div>
         <div class="field"><label for="p-current">Max current (A)</label><input id="p-current" data-p-current type="number" min="1" value="300" /></div>
+        <div class="field"><label for="p-country">Country code</label><input id="p-country" data-p-country value="DE" maxlength="3" /></div>
+        <div class="field"><label for="p-operator">Operator ID (CPO)</label><input id="p-operator" data-p-operator value="REY" maxlength="6" /></div>
+        <div class="field"><label for="p-evseid">EVSE ID</label><input id="p-evseid" data-p-evseid value="E000001" /></div>
+        <div class="field"><label for="p-stationid">Charging Station ID</label><input id="p-stationid" data-p-stationid value="REY-STATION-01" /></div>
+        <div class="field"><label for="p-tariff">Default tariff</label><input id="p-tariff" data-p-tariff placeholder="e.g. 0.45 EUR/kWh" /></div>
+        <div class="field"><label for="p-emaid">Default eMAID (PnC)</label><input id="p-emaid" data-p-emaid value="DE-REY-C12345-3" /></div>
       </div>
       <p class="hint small profile-note">Connector count is reported to your backend (e.g. <code>NumberOfConnectors</code>); the live demo drives one connector at a time.</p>
     </details>
@@ -85,12 +91,15 @@
     <h2>Station</h2>
     <div class="identity" data-identity hidden>
       <div class="id-row"><span class="id-k">Charge point ID (CBID)</span><span class="id-v" data-id-cbid>—</span></div>
+      <div class="id-row"><span class="id-k">EVSE ID (ISO 15118)</span><span class="id-v" data-id-evseid>—</span></div>
+      <div class="id-row"><span class="id-k">Charging Station ID</span><span class="id-v" data-id-stationid>—</span></div>
       <div class="id-row"><span class="id-k">OCPP</span><span class="id-v" data-id-ocpp>—</span></div>
       <div class="id-row"><span class="id-k">Vendor · Model</span><span class="id-v" data-id-vendormodel>—</span></div>
       <div class="id-row"><span class="id-k">Serial</span><span class="id-v" data-id-serial>—</span></div>
       <div class="id-row"><span class="id-k">Firmware</span><span class="id-v" data-id-firmware>—</span></div>
       <div class="id-row"><span class="id-k">Connector</span><span class="id-v" data-id-connector>—</span></div>
       <div class="id-row"><span class="id-k">Rated power</span><span class="id-v" data-id-power>—</span></div>
+      <div class="id-row"><span class="id-k">Tariff</span><span class="id-v" data-id-tariff>—</span></div>
     </div>
     <div class="state-grid">
       <div class="state"><span class="state-k">Connector</span><span class="state-v" data-connector>—</span></div>
