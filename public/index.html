@@ -58,6 +58,7 @@
     <button type="submit" class="btn btn-primary" data-connect-btn>Connect</button>
   </form>
   <p class="hint" data-own-hint>Enter your CSMS's <code>wss://</code> URL, a station id, and a Basic-auth password if it needs one. The relay presents the auth headers your browser can't.</p>
+  <p class="hint session-note" data-session-note>ℹ️ Free version: if the station sits idle for a while it may be put to sleep, so a session can drop after a period of inactivity — it wakes again within a few seconds on reconnect. While Rey is free, there's no cap on how much you can use it.</p>
 </section>
 
 <div class="cta-banner" data-cta hidden>
@@ -69,6 +70,15 @@
 <main class="grid">
   <aside class="panel station">
     <h2>Station</h2>
+    <div class="identity" data-identity hidden>
+      <div class="id-row"><span class="id-k">Charge point ID (CBID)</span><span class="id-v" data-id-cbid>—</span></div>
+      <div class="id-row"><span class="id-k">OCPP</span><span class="id-v" data-id-ocpp>—</span></div>
+      <div class="id-row"><span class="id-k">Vendor · Model</span><span class="id-v" data-id-vendormodel>—</span></div>
+      <div class="id-row"><span class="id-k">Serial</span><span class="id-v" data-id-serial>—</span></div>
+      <div class="id-row"><span class="id-k">Firmware</span><span class="id-v" data-id-firmware>—</span></div>
+      <div class="id-row"><span class="id-k">Connector</span><span class="id-v" data-id-connector>—</span></div>
+      <div class="id-row"><span class="id-k">Rated power</span><span class="id-v" data-id-power>—</span></div>
+    </div>
     <div class="state-grid">
       <div class="state"><span class="state-k">Connector</span><span class="state-v" data-connector>—</span></div>
       <div class="state"><span class="state-k">Charging</span><span class="state-v" data-charging>—</span></div>
@@ -122,7 +132,7 @@
     </details>
 
     <details class="sub-panel" data-dm-panel>
-      <summary>Device model <span class="sub-count" data-dm-count></span></summary>
+      <summary><span data-dm-label>Device model</span> <span class="sub-count" data-dm-count></span></summary>
       <p class="hint small" data-dm-hint>Connect to load the device model. Edit a value to change it on the station, or send GetVariables/SetVariables from the CSMS.</p>
       <div class="dm-list" data-dm-list></div>
     </details>

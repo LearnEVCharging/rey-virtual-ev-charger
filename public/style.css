@@ -156,6 +156,14 @@ code { font-family: "SF Mono", Menlo, Consolas, monospace; background: rgba(0,0,
 .state-k { display: block; font-size: 11px; text-transform: uppercase; letter-spacing: 0.05em; color: var(--muted); }
 .state-v { display: block; font-size: 15px; font-weight: 700; color: var(--navy); font-variant-numeric: tabular-nums; }
 
+/* Station nameplate — the identity/config a backend needs to register the CP. */
+.identity { border: 1px solid var(--line); border-radius: 8px; background: var(--bg); padding: 2px 12px; margin-bottom: 16px; }
+.id-row { display: flex; justify-content: space-between; align-items: baseline; gap: 12px; padding: 7px 0; border-bottom: 1px solid var(--line); }
+.id-row:last-child { border-bottom: none; }
+.id-k { font-size: 11px; text-transform: uppercase; letter-spacing: 0.05em; color: var(--muted); white-space: nowrap; }
+.id-v { font-size: 13px; font-weight: 700; color: var(--navy); font-family: "SF Mono", Menlo, monospace; text-align: right; word-break: break-word; }
+.session-note { border-left: 3px solid var(--sky); background: var(--bg); padding: 8px 12px; border-radius: 6px; }
+
 .controls { display: flex; flex-direction: column; gap: 8px; }
 .rfid { display: flex; gap: 6px; }
 .rfid input { flex: 1; padding: 9px 10px; border: 1px solid var(--line); border-radius: 8px; font-family: "SF Mono", Menlo, monospace; font-size: 13px; background: var(--bg); }

@@ -126,7 +126,7 @@ wss.on('connection', (browser) => {
           onLocalList: (list) => send({ type: 'localList', list }),
         });
         await charger.connect();
-        send({ type: 'connected', identity: charger.identity, demo: !!msg.demo, version });
+        send({ type: 'connected', identity: charger.identity, demo: !!msg.demo, version, station: charger.identityInfo?.() });
         return;
       }
 

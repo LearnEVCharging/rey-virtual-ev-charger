@@ -25,6 +25,13 @@ export class VirtualCharger {
     model = 'Rey-1',
     vendor = 'Learn EV Charging',
     protocol = 'ocpp2.0.1',
+    serialNumber = 'REY-SIM-0001',
+    firmwareVersion = '1.0.0',
+    connectorType = 'CCS2',
+    connectorCount = 1,
+    maxPowerKw = 150,
+    maxVoltageV = 500,
+    maxCurrentA = 300,
     onLog = () => {},
     onState = () => {},
     onVars = () => {},
@@ -36,6 +43,13 @@ export class VirtualCharger {
     this.model = model;
     this.vendor = vendor;
     this.protocol = protocol;
+    this.serialNumber = serialNumber;
+    this.firmwareVersion = firmwareVersion;
+    this.connectorType = connectorType;
+    this.connectorCount = connectorCount;
+    this.maxPowerKw = maxPowerKw;
+    this.maxVoltageV = maxVoltageV;
+    this.maxCurrentA = maxCurrentA;
     this.authMode = 'rfid'; // rfid | app | pnc (Plug & Charge)
     this.onLog = onLog;
     this.onState = onState;
@@ -264,11 +278,33 @@ export class VirtualCharger {
     this._meterTimer = null;
   }
 
+  // ---- identity / nameplate (what a backend needs to register the station) --
+  identityInfo() {
+    return {
+      identity: this.identity,
+      protocol: this.protocol,
+      vendor: this.vendor,
+      model: this.model,
+      serialNumber: this.serialNumber,
+      firmwareVersion: this.firmwareVersion,
+      connectorType: this.connectorType,
+      connectorCount: this.connectorCount,
+      maxPowerKw: this.maxPowerKw,
+      maxVoltageV: this.maxVoltageV,
+      maxCurrentA: this.maxCurrentA,
+    };
+  }
+
   // ---- boot + heartbeat ---------------------------------------------------
   async boot(reason = 'PowerUp') {
     const res = await this.client.call('BootNotification', {
       reason,
-      chargingStation: { model: this.model, vendorName: this.vendor },
+      chargingStation: {
+        model: this.model,
+        vendorName: this.vendor,
+        serialNumber: this.serialNumber,
+        firmwareVersion: this.firmwareVersion,
+      },
     });
     if (res?.interval) this._setState({ heartbeatInterval: res.interval });
     if (res?.status === 'Accepted') {
@@ -353,7 +389,7 @@ export class VirtualCharger {
       idToken: { idToken, type: 'ISO14443' },
       meterValue: [this._meterValue()],
     });
-    this._setState({ seqNo: this.state.seqNo + 1, chargingState: 'Charging', powerW: 11000 });
+    this._setState({ seqNo: this.state.seqNo + 1, chargingState: 'Charging', powerW: this.maxPowerKw * 1000 });
     this._startMeterLoop();
   }
 

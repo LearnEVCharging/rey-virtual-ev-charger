@@ -25,6 +25,13 @@ export class VirtualCharger16 {
     password,
     model = 'Rey-1',
     vendor = 'Learn EV Charging',
+    serialNumber = 'REY-SIM-0001',
+    firmwareVersion = '1.0.0',
+    connectorType = 'CCS2',
+    connectorCount = 1,
+    maxPowerKw = 150,
+    maxVoltageV = 500,
+    maxCurrentA = 300,
     onLog = () => {},
     onState = () => {},
     onVars = () => {},
@@ -35,6 +42,13 @@ export class VirtualCharger16 {
     this.identity = identity;
     this.model = model;
     this.vendor = vendor;
+    this.serialNumber = serialNumber;
+    this.firmwareVersion = firmwareVersion;
+    this.connectorType = connectorType;
+    this.connectorCount = connectorCount;
+    this.maxPowerKw = maxPowerKw;
+    this.maxVoltageV = maxVoltageV;
+    this.maxCurrentA = maxCurrentA;
     this.protocol = 'ocpp1.6';
     this.authMode = 'rfid'; // rfid | app (Plug & Charge is OCPP 2.0.1+)
     this.onLog = onLog;
@@ -61,7 +75,7 @@ export class VirtualCharger16 {
       MeterValueSampleInterval: '60',
       ConnectorPhaseRotation: 'RST',
       AuthorizeRemoteTxRequests: 'true',
-      NumberOfConnectors: '1',
+      NumberOfConnectors: String(connectorCount),
     };
 
     // Certificate management (OCPP 1.6 Security Whitepaper extension).
@@ -224,11 +238,30 @@ export class VirtualCharger16 {
     this._meterTimer = null;
   }
 
+  // ---- identity / nameplate (what a backend needs to register the station) --
+  identityInfo() {
+    return {
+      identity: this.identity,
+      protocol: this.protocol,
+      vendor: this.vendor,
+      model: this.model,
+      serialNumber: this.serialNumber,
+      firmwareVersion: this.firmwareVersion,
+      connectorType: this.connectorType,
+      connectorCount: this.connectorCount,
+      maxPowerKw: this.maxPowerKw,
+      maxVoltageV: this.maxVoltageV,
+      maxCurrentA: this.maxCurrentA,
+    };
+  }
+
   // ---- boot + heartbeat ---------------------------------------------------
   async boot(reason = 'PowerUp') {
     const res = await this.client.call('BootNotification', {
       chargePointVendor: this.vendor,
       chargePointModel: this.model,
+      chargePointSerialNumber: this.serialNumber,
+      firmwareVersion: this.firmwareVersion,
     });
     if (res?.interval) this._setState({ heartbeatInterval: res.interval });
     if (res?.status === 'Accepted') {
@@ -284,7 +317,7 @@ export class VirtualCharger16 {
     this._setState({
       transactionId: res?.transactionId ?? null,
       chargingState: 'Charging',
-      powerW: 11000,
+      powerW: this.maxPowerKw * 1000,
     });
     await this.setStatus('Charging');
     this._startMeterLoop();
