@@ -220,10 +220,26 @@
     }
   });
 
+  // Read the editable station nameplate (commissioning values sent on connect).
+  function readProfile() {
+    const num = (sel, d) => { const v = parseFloat($(sel)?.value); return Number.isFinite(v) ? v : d; };
+    const str = (sel, d) => { const v = $(sel)?.value?.trim(); return v || d; };
+    return {
+      serialNumber: str('[data-p-serial]', 'REY-SIM-0001'),
+      firmwareVersion: str('[data-p-firmware]', '1.0.0'),
+      connectorType: str('[data-p-conntype]', 'CCS2'),
+      connectorCount: Math.max(1, Math.round(num('[data-p-conncount]', 1))),
+      maxPowerKw: num('[data-p-power]', 150),
+      maxVoltageV: num('[data-p-voltage]', 500),
+      maxCurrentA: num('[data-p-current]', 300),
+    };
+  }
+
   function doConnect() {
     setConn('connecting');
+    const profile = readProfile();
     if (section.classList.contains('mode-demo')) {
-      sendRelay({ type: 'connect', demo: true, identity: 'Rey-DEMO', version });
+      sendRelay({ type: 'connect', demo: true, identity: 'Rey-DEMO', version, ...profile });
     } else {
       sendRelay({
         type: 'connect',
@@ -231,6 +247,7 @@
         identity: $('#identity').value.trim(),
         password: $('#password').value,
         version,
+        ...profile,
       });
     }
   }
@@ -261,9 +278,12 @@
 
   function setControls() {
     document.querySelectorAll('[data-act], [data-local-add]').forEach((b) => { b.disabled = !connected; });
-    // Lock the version + mode pickers during a live session.
+    // Lock the version + mode pickers and the nameplate editor during a live session.
     document.querySelectorAll('[data-ver-select] .ver-btn, [data-mode-toggle] .mode-btn').forEach((b) => {
       b.disabled = connected;
+    });
+    document.querySelectorAll('[data-profile-panel] input, [data-profile-panel] select').forEach((el) => {
+      el.disabled = connected;
     });
   }
 

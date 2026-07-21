@@ -164,6 +164,16 @@ code { font-family: "SF Mono", Menlo, Consolas, monospace; background: rgba(0,0,
 .id-v { font-size: 13px; font-weight: 700; color: var(--navy); font-family: "SF Mono", Menlo, monospace; text-align: right; word-break: break-word; }
 .session-note { border-left: 3px solid var(--sky); background: var(--bg); padding: 8px 12px; border-radius: 6px; }
 
+/* Editable station nameplate (commissioning) — set before you connect. */
+.profile-panel { flex-basis: 100%; width: 100%; border: 1px solid var(--line); border-radius: 8px; background: var(--bg); }
+.profile-panel > summary { cursor: pointer; padding: 10px 12px; font-weight: 700; font-size: 13px; color: var(--navy); list-style: none; }
+.profile-panel > summary::-webkit-details-marker { display: none; }
+.profile-panel > summary::before { content: '▸'; color: var(--muted); font-size: 11px; margin-right: 8px; }
+.profile-panel[open] > summary::before { content: '▾'; }
+.profile-grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(130px, 1fr)); gap: 12px; padding: 2px 12px 14px; }
+.profile-grid select { padding: 9px 10px; border: 1px solid var(--line); border-radius: 8px; font-size: 13px; background: var(--surface); color: var(--ink); }
+.profile-grid input:disabled, .profile-grid select:disabled { opacity: 0.55; cursor: not-allowed; }
+
 .controls { display: flex; flex-direction: column; gap: 8px; }
 .rfid { display: flex; gap: 6px; }
 .rfid input { flex: 1; padding: 9px 10px; border: 1px solid var(--line); border-radius: 8px; font-family: "SF Mono", Menlo, monospace; font-size: 13px; background: var(--bg); }

@@ -82,6 +82,23 @@ function endpointAllowed(endpoint) {
   return false;
 }
 
+// Clamp/whitelist the browser-supplied station nameplate so a user can't inject
+// absurd values into what the station reports. Unset fields fall back to the
+// charger's own defaults.
+function sanitizeProfile(msg) {
+  const out = {};
+  const str = (v, max) => (typeof v === 'string' && v.trim() ? v.trim().slice(0, max) : undefined);
+  const num = (v, lo, hi) => (Number.isFinite(v) ? Math.min(Math.max(v, lo), hi) : undefined);
+  const serialNumber = str(msg.serialNumber, 40); if (serialNumber) out.serialNumber = serialNumber;
+  const firmwareVersion = str(msg.firmwareVersion, 40); if (firmwareVersion) out.firmwareVersion = firmwareVersion;
+  const connectorType = str(msg.connectorType, 20); if (connectorType) out.connectorType = connectorType;
+  const connectorCount = num(msg.connectorCount, 1, 8); if (connectorCount != null) out.connectorCount = Math.round(connectorCount);
+  const maxPowerKw = num(msg.maxPowerKw, 1, 1000); if (maxPowerKw != null) out.maxPowerKw = maxPowerKw;
+  const maxVoltageV = num(msg.maxVoltageV, 1, 2000); if (maxVoltageV != null) out.maxVoltageV = maxVoltageV;
+  const maxCurrentA = num(msg.maxCurrentA, 1, 1000); if (maxCurrentA != null) out.maxCurrentA = maxCurrentA;
+  return out;
+}
+
 // ---- browser <-> relay bridge -------------------------------------------
 const wss = new WebSocketServer({ server: httpServer, path: '/ws' });
 
@@ -119,6 +136,7 @@ wss.on('connection', (browser) => {
           identity,
           password: msg.demo ? undefined : (msg.password || undefined),
           model: msg.model || 'Rey-1',
+          ...sanitizeProfile(msg),
           onLog: (entry) => send({ type: 'log', entry }),
           onState: (state) => send({ type: 'state', state }),
           onVars: (vars) => send({ type: 'vars', vars }),

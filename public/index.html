@@ -54,6 +54,18 @@
         <input id="password" name="password" type="password" placeholder="—" />
       </div>
     </div>
+    <details class="profile-panel" data-profile-panel>
+      <summary>Station profile <span class="opt">— the nameplate the station reports to the backend</span></summary>
+      <div class="profile-grid">
+        <div class="field"><label for="p-serial">Serial</label><input id="p-serial" data-p-serial value="REY-SIM-0001" /></div>
+        <div class="field"><label for="p-firmware">Firmware</label><input id="p-firmware" data-p-firmware value="1.0.0" /></div>
+        <div class="field"><label for="p-conntype">Connector</label><select id="p-conntype" data-p-conntype><option>CCS2</option><option>CCS1</option><option>Type 2</option><option>CHAdeMO</option><option>Type 1</option><option>NACS</option></select></div>
+        <div class="field"><label for="p-conncount">Connectors</label><input id="p-conncount" data-p-conncount type="number" min="1" max="4" value="1" /></div>
+        <div class="field"><label for="p-power">Rated power (kW)</label><input id="p-power" data-p-power type="number" min="1" value="150" /></div>
+        <div class="field"><label for="p-voltage">Max voltage (V)</label><input id="p-voltage" data-p-voltage type="number" min="1" value="500" /></div>
+        <div class="field"><label for="p-current">Max current (A)</label><input id="p-current" data-p-current type="number" min="1" value="300" /></div>
+      </div>
+    </details>
     <p class="demo-note" data-demo-note>A built-in OCPP&nbsp;<span data-demo-ver>2.0.1</span> CSMS runs on the server — just hit <strong>Connect</strong> and drive the station. No backend of your own needed.</p>
     <button type="submit" class="btn btn-primary" data-connect-btn>Connect</button>
   </form>
