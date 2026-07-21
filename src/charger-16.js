@@ -93,6 +93,8 @@ export class VirtualCharger16 {
       NumberOfConnectors: String(connectorCount),
       ConnectorType: this.connectorType,
       RatedPowerKW: String(this.maxPowerKw),
+      MaxVoltageV: String(this.maxVoltageV),
+      MaxCurrentA: String(this.maxCurrentA),
       ChargingStationId: this.chargingStationId,
       CountryCode: this.countryCode,
       EVSEOperatorID: this.operatorId,
@@ -103,7 +105,10 @@ export class VirtualCharger16 {
     // Config key -> nameplate field; editing one updates the nameplate.
     this._identityVarMap = {
       ConnectorType: 'connectorType',
+      NumberOfConnectors: 'connectorCount',
       RatedPowerKW: 'maxPowerKw',
+      MaxVoltageV: 'maxVoltageV',
+      MaxCurrentA: 'maxCurrentA',
       ChargingStationId: 'chargingStationId',
       CountryCode: 'countryCode',
       EVSEOperatorID: 'operatorId',
@@ -309,7 +314,8 @@ export class VirtualCharger16 {
   _syncIdentityFromVar(key, value) {
     const field = this._identityVarMap?.[key];
     if (!field) return false;
-    this[field] = field === 'maxPowerKw' ? (Number(value) || this.maxPowerKw) : value;
+    const numeric = ['maxPowerKw', 'maxVoltageV', 'maxCurrentA', 'connectorCount'];
+    this[field] = numeric.includes(field) ? (Number(value) || this[field]) : value;
     return true;
   }
 

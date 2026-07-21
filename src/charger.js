@@ -91,7 +91,10 @@ export class VirtualCharger {
       'AuthCtrlr/AuthorizeRemoteStart': 'true',
       'DeviceDataCtrlr/BytesPerMessageGetReport': '0',
       'Connector/ConnectorType': this.connectorType,
+      'ChargingStation/ConnectorCount': String(this.connectorCount),
       'ChargingStation/RatedPowerKW': String(this.maxPowerKw),
+      'Connector/MaxVoltage': String(this.maxVoltageV),
+      'Connector/MaxCurrent': String(this.maxCurrentA),
       'ChargingStation/ChargingStationId': this.chargingStationId,
       'ISO15118Ctrlr/CountryCode': this.countryCode,
       'ISO15118Ctrlr/EVSEOperatorID': this.operatorId,
@@ -103,7 +106,10 @@ export class VirtualCharger {
     // the Configuration panel or via SetVariables) updates the nameplate.
     this._identityVarMap = {
       'Connector/ConnectorType': 'connectorType',
+      'ChargingStation/ConnectorCount': 'connectorCount',
       'ChargingStation/RatedPowerKW': 'maxPowerKw',
+      'Connector/MaxVoltage': 'maxVoltageV',
+      'Connector/MaxCurrent': 'maxCurrentA',
       'ChargingStation/ChargingStationId': 'chargingStationId',
       'ISO15118Ctrlr/CountryCode': 'countryCode',
       'ISO15118Ctrlr/EVSEOperatorID': 'operatorId',
@@ -349,7 +355,8 @@ export class VirtualCharger {
   _syncIdentityFromVar(key, value) {
     const field = this._identityVarMap?.[key];
     if (!field) return false;
-    this[field] = field === 'maxPowerKw' ? (Number(value) || this.maxPowerKw) : value;
+    const numeric = ['maxPowerKw', 'maxVoltageV', 'maxCurrentA', 'connectorCount'];
+    this[field] = numeric.includes(field) ? (Number(value) || this[field]) : value;
     return true;
   }
 
