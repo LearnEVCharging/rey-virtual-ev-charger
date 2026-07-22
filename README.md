@@ -64,15 +64,28 @@ npm run mock-csms     # (optional) run the mock CSMS standalone on ws://localhos
   `Reset`, `TriggerMessage`, `ChangeAvailability`, `GetVariables`, `SetVariables`,
   `GetBaseReport → NotifyReport`.
 - **Authentication modes** — pick **RFID**, **App** (CSMS-driven remote start), or
-  **Plug & Charge**. PnC (OCPP 2.0.1/2.1) authorises by **eMAID** and sends
+  **Plug & Charge**. PnC (OCPP 2.0.1/2.1): the SECC presents its **EVSEID** at
+  SessionSetup, then authorises by **eMAID** and sends
   `Get15118EVCertificate` + `Authorize` — the OCPP-visible half of PnC is real; the
   ISO 15118 EV↔charger leg itself is represented, not wire-accurate (a browser can't
   do it).
 - **Local Authorization List** — whitelist an RFID/eMAID on the station and it
   authorises **locally** (no `Authorize` sent to the backend — how a station stays
   usable offline); unknown tokens still go to the CSMS. Also handles `SendLocalList`.
-- **Device model panel** — browse and edit the station's variables live (the flat
-  configuration keys in 1.6); the CSMS's `SetVariables` updates them in place.
+- **Station nameplate & identity** — every session shows the charge point's full
+  identity: **CBID** (charge point id), OCPP version, vendor / model, **serial** and
+  **firmware** (now sent in `BootNotification`), connector type + count, rated
+  power / voltage / current, plus the **ISO 15118 EVSE ID** in eMI3 form
+  `<Country>*<Operator>*<EVSE id>` (e.g. `DE*REY*E000001`), Charging Station ID and tariff.
+- **Editable "Station profile" (commissioning)** — set any of those before you connect
+  and Rey reports them to the backend: serial / firmware in `BootNotification`,
+  `NumberOfConnectors`, rated power driving the meter simulation, and the EVSE ID the
+  SECC presents at Plug & Charge SessionSetup. Inputs are sanitised / clamped server-side.
+- **Configuration panel with two-way sync** — the whole nameplate is mirrored into the
+  device model (2.0.1 / 2.1) / configuration keys (1.6), the same field set across all
+  three versions. Edit a value there — or have the CSMS `SetVariables` /
+  `ChangeConfiguration` it — and the nameplate updates live (the EVSE ID recomposes).
+  The panel is labelled "Device model" on 2.0.1 / 2.1 and "Configuration keys" on 1.6.
 - **Certificate management (all three versions)** — click *Request a certificate* and
   the charge point generates a **real** RSA key pair + PKCS#10 CSR (`openssl`-verifiable)
   and sends `SignCertificate`; the demo CSMS drives the full sequence — installs the
@@ -86,6 +99,9 @@ npm run mock-csms     # (optional) run the mock CSMS standalone on ws://localhos
 - A live frame log with direction, CALL/CALLRESULT/CALLERROR badges, correlated
   message ids, and expandable JSON.
 - Relay guardrails: `wss://` (any) or `ws://localhost` only.
+- **Charge-point-id clash handling** — a CSMS accepts one live connection per id, so if a
+  *Connect my CSMS* attempt fails, Rey explains the likely cause and offers a one-click
+  **"use a unique Station ID & retry"**.
 
 ## Roadmap
 
