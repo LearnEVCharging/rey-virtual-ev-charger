@@ -11,6 +11,7 @@
   const section = $('[data-connect-section]');
   let ws = null;
   let connected = false;
+  let pendingConnect = false; // a connect attempt is in flight
   let sessionDemo = true; // whether the current session is the built-in demo CSMS
   let ctaShown = false;
   let version = '2.0.1'; // selected OCPP version — sent to the relay on connect
@@ -84,7 +85,7 @@
       try { msg = JSON.parse(ev.data); } catch { return; }
       handle(msg);
     };
-    ws.onclose = () => { setConn('disconnected'); connected = false; setControls(); };
+    ws.onclose = () => { setConn('disconnected'); connected = false; pendingConnect = false; setControls(); };
   }
 
   function sendRelay(obj) {
@@ -98,10 +99,13 @@
     if (msg.type === 'vars') return renderVars(msg.vars);
     if (msg.type === 'certs') return renderCerts(msg.certs);
     if (msg.type === 'localList') return renderLocalList(msg.list);
-    if (msg.type === 'connected') { connected = true; sessionDemo = !!msg.demo; ctaShown = false; setConn('connected'); setControls(); renderIdentity(msg.station, msg.version, true); return; }
+    if (msg.type === 'connected') { connected = true; pendingConnect = false; sessionDemo = !!msg.demo; ctaShown = false; hideConnectError(); setConn('connected'); setControls(); renderIdentity(msg.station, msg.version, true); return; }
     if (msg.type === 'identity') { renderIdentity(msg.station, version, false); return; }
     if (msg.type === 'disconnected') { connected = false; setConn('disconnected'); setControls(); clearPanels(); return; }
-    if (msg.type === 'error') return renderNote('⚠ ' + msg.message, true);
+    if (msg.type === 'error') {
+      if (msg.kind === 'connect-failed') { pendingConnect = false; showConnectError(msg.message); return; }
+      return renderNote('⚠ ' + msg.message, true);
+    }
   }
 
   // ---- device model + certificates ---------------------------------------
@@ -244,6 +248,8 @@
 
   function doConnect() {
     setConn('connecting');
+    hideConnectError();
+    pendingConnect = true;
     const profile = readProfile();
     if (section.classList.contains('mode-demo')) {
       sendRelay({ type: 'connect', demo: true, identity: 'Rey-DEMO', version, ...profile });
@@ -258,6 +264,29 @@
       });
     }
   }
+
+  // ---- connect-error hint (e.g. a charge point id already in use) ----------
+  function showConnectError(message) {
+    const msgEl = $('[data-connect-error-msg]');
+    if (msgEl) msgEl.textContent = message;
+    const box = $('[data-connect-error]');
+    if (box) box.hidden = false;
+  }
+  function hideConnectError() {
+    const box = $('[data-connect-error]');
+    if (box) box.hidden = true;
+  }
+  // Give the station a unique id and retry — the common fix for a CBID clash.
+  $('[data-unique-id]')?.addEventListener('click', () => {
+    const idInput = $('#identity');
+    if (idInput) {
+      const base = (idInput.value.trim() || 'Rey-001').replace(/-[A-Z0-9]{3,4}$/, '');
+      idInput.value = `${base}-${Math.random().toString(36).slice(2, 6).toUpperCase()}`;
+    }
+    hideConnectError();
+    if (ws && ws.readyState === WebSocket.OPEN) doConnect();
+    else { openRelay(); ws.addEventListener('open', doConnect, { once: true }); }
+  });
 
   // ---- station controls ---------------------------------------------------
   document.querySelectorAll('[data-act]').forEach((btn) => {

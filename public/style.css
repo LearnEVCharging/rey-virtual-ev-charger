@@ -174,6 +174,8 @@ code { font-family: "SF Mono", Menlo, Consolas, monospace; background: rgba(0,0,
 .profile-grid select { padding: 9px 10px; border: 1px solid var(--line); border-radius: 8px; font-size: 13px; background: var(--surface); color: var(--ink); }
 .profile-grid input:disabled, .profile-grid select:disabled { opacity: 0.55; cursor: not-allowed; }
 .profile-note { padding: 0 12px 14px; margin: 0; }
+.connect-error { margin-top: 12px; border: 1px solid var(--red); background: #fdecee; border-radius: 8px; padding: 10px 14px; display: flex; flex-wrap: wrap; align-items: center; gap: 12px; }
+.connect-error-msg { margin: 0; color: var(--red); font-size: 13px; line-height: 1.5; flex: 1; min-width: 240px; }
 
 .controls { display: flex; flex-direction: column; gap: 8px; }
 .rfid { display: flex; gap: 6px; }

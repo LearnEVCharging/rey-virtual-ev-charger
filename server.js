@@ -150,7 +150,22 @@ wss.on('connection', (browser) => {
           onLocalList: (list) => send({ type: 'localList', list }),
           onIdentity: (station) => send({ type: 'identity', station }),
         });
-        await charger.connect();
+        try {
+          await charger.connect();
+        } catch (err) {
+          const failed = charger; charger = null;
+          await failed?.disconnect?.().catch(() => {});
+          if (isDemo) {
+            send({ type: 'error', message: 'The built-in demo CSMS is not reachable right now — please try again in a moment.' });
+          } else {
+            send({
+              type: 'error',
+              kind: 'connect-failed',
+              message: `Couldn't connect to ${endpoint}. Check the URL and password. Note a CSMS accepts only one live connection per charge point id — if "${identity}" is already connected there, give the station a unique ID and retry.`,
+            });
+          }
+          return;
+        }
         send({ type: 'connected', identity: charger.identity, demo: !!msg.demo, version, station: charger.identityInfo?.() });
         return;
       }

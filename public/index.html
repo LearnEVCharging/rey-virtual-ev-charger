@@ -78,6 +78,10 @@
   </form>
   <p class="hint" data-own-hint>Enter your CSMS's <code>wss://</code> URL, a station id, and a Basic-auth password if it needs one. The relay presents the auth headers your browser can't.</p>
   <p class="hint session-note" data-session-note>ℹ️ Free version: if the station sits idle for a while it may be put to sleep, so a session can drop after a period of inactivity — it wakes again within a few seconds on reconnect. While Rey is free, there's no cap on how much you can use it.</p>
+  <div class="connect-error" data-connect-error hidden>
+    <p class="connect-error-msg" data-connect-error-msg></p>
+    <button type="button" class="btn btn-small" data-unique-id>Use a unique Station ID &amp; retry →</button>
+  </div>
 </section>
 
 <div class="cta-banner" data-cta hidden>
